@@ -18,10 +18,10 @@ MAKEFLAGS += --no-print-directory
 export PYTHONPATH := $(CURDIR)/src
 
 ##### TARGETS #####
-.PHONY: help install sync lock lint type arch test check run up down build logs clean
+.PHONY: help install sync lock lint type arch test check run up down build logs clean docs docs-build init
 
 help:
-	@printf "$(BOLD)$(CYAN)$(PROJECT)$(RESET) $(GRAY)· uv · ruff · ty · tach · pytest · docker$(RESET)\n\n"
+	@printf "$(BOLD)$(CYAN)$(PROJECT)$(RESET) $(GRAY)· uv · ruff · ty · tach · pytest · properdocs · docker$(RESET)\n\n"
 	@awk 'BEGIN{FS=":.*##"} /^[a-z][a-zA-Z0-9_-]*:.*##/{printf "  $(GREEN)%-8s$(RESET) $(GRAY)%s$(RESET)\n",$$1,$$2}' $(MAKEFILE_LIST)
 
 install: ## full setup: sync deps + git hooks
@@ -69,10 +69,20 @@ build: ## docker image build [args: services]
 logs: ## tail docker logs [args: service]
 	@docker compose -f $(COMPOSE) logs -f $(ARGS)
 
+docs: ## serve docs site live at :8000
+	@uv run properdocs serve
+
+docs-build: ## strict docs build to site/
+	@uv run properdocs build --strict
+
 clean: ## remove caches + build artifacts
 	@find . -type d \( -name __pycache__ -o -name .pytest_cache -o -name .ruff_cache \) -exec rm -rf {} + 2>/dev/null || true
 	@rm -rf dist build *.egg-info .coverage .coverage.* htmlcov .ty_cache .benchmarks
 	@printf "$(GREEN)✓ clean$(RESET)\n"
+
+##### SCRIPTS #####
+init: ## scaffold: rename template to a new project [args: name]
+	@python3 scripts/init.py $(ARGS)
 
 %:
 	@:

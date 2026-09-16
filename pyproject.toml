@@ -55,7 +55,16 @@ test = [
 dev = [
     { include-group = "lint" },
     { include-group = "test" },
+    { include-group = "docs" },
     "prek>=0.4",
+]
+docs = [
+    "mkdocs-gen-files>=0.6.1",
+    "mkdocs-literate-nav>=0.6.3",
+    "mkdocs-material>=9.7.7",
+    "mkdocs-section-index>=0.3.12",
+    "mkdocstrings[python]>=1.0.6",
+    "properdocs>=1.6.7",
 ]
 
 [tool.uv]
@@ -96,6 +105,7 @@ ignore = ["E501", "ISC001", "PLR0913"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "PLR2004", "ARG", "FBT"]
+"scripts/**" = ["T20", "S603", "S607", "PTH"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["e_api"]
