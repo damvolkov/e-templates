@@ -1,0 +1,141 @@
+##### BUILD #####
+[build-system]
+requires = ["hatchling>=1.32", "uv-dynamic-versioning>=0.14"]
+build-backend = "hatchling.build"
+
+##### PROJECT #####
+[project]
+name = "e-api"
+dynamic = ["version"]
+description = "e-stack API service: FastAPI + Pydantic on uv, Rust-backed tooling end to end"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+authors = [{ name = "damvolkov", email = "damvolkovv@gmail.com" }]
+keywords = ["e-stack"]
+classifiers = [
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+]
+dependencies = [
+    "fastapi[standard]>=0.141",
+    "pydantic>=2.13",
+    "pydantic-settings>=2.15",
+    "msgspec>=0.21",
+    "structlog>=26.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/damvolkov"
+
+##### DEPS #####
+[dependency-groups]
+lint = [
+    "ruff>=0.16",
+    "ty>=0.0.75",
+    "tach>=0.35",
+    "validate-pyproject[all]>=0.26",
+    "zizmor>=1.25",
+]
+test = [
+    "pytest>=9.1",
+    "pytest-asyncio>=1.4",
+    "pytest-cov>=7.1",
+    "pytest-xdist[psutil]>=3.8",
+    "pytest-randomly>=5.0",
+    "pytest-timeout>=2.4",
+    "pytest-benchmark>=5.3",
+    "polyfactory>=3.3",
+    "inline-snapshot>=0.30",
+    "hypothesis>=6.150",
+    "pyyaml>=6.0",
+]
+dev = [
+    { include-group = "lint" },
+    { include-group = "test" },
+    "prek>=0.4",
+]
+
+[tool.uv]
+required-version = ">=0.12"
+default-groups = ["dev"]
+exclude-newer = "7 days"
+cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true, tags = true } }]
+
+##### VERSION #####
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "pep440"
+bump = true
+fallback-version = "0.0.0"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/e_api"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/", "tests/", "README.md"]
+
+##### LINT #####
+[tool.ruff]
+line-length = 120
+target-version = "py314"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "F", "E", "W", "I", "N", "UP", "B", "A", "C4", "DTZ", "T10", "T20", "EM", "ISC",
+    "PIE", "PT", "RET", "SIM", "TID", "TC", "ARG", "PTH", "PL", "PERF", "FURB",
+    "ASYNC", "S", "BLE", "FBT", "LOG", "G", "RUF",
+]
+ignore = ["E501", "ISC001", "PLR0913"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "PLR2004", "ARG", "FBT"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["e_api"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.format]
+docstring-code-format = true
+
+##### TYPES #####
+[tool.ty.environment]
+python-version = "3.14"
+
+[tool.ty.src]
+include = ["src", "tests"]
+
+[tool.ty.terminal]
+error-on-warning = true
+
+##### TEST #####
+[tool.pytest]
+minversion = "9.0"
+testpaths = ["tests"]
+addopts = ["--import-mode=importlib", "-ra"]
+strict = true
+filterwarnings = ["error"]
+timeout = "60"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["slow: slow tests (deselect with -m 'not slow')"]
+
+##### COVERAGE #####
+[tool.coverage.run]
+source_pkgs = ["e_api"]
+branch = true
+parallel = true
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+skip_covered = true
+exclude_also = ["if TYPE_CHECKING:", "@overload", "raise NotImplementedError", '^\s*\.\.\.$']
