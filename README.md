@@ -23,6 +23,8 @@ src/e_api/          # all modules live here: core/logger.py, core/settings.py, .
 tests/unit/         # mirrors src, import-mode=importlib
 scripts/            # init.py (scaffold), gen_ref_pages.py (docs)
 docs/               # site landing; reference/ auto-generated from sources
+Dockerfile          # two-stage: builder (uv) + deploy (python-slim, non-root)
+compose.yml         # single e-api service, :8000
 ```
 
 ##### USAGE #####

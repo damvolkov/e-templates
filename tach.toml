@@ -7,12 +7,12 @@ forbid_circular_dependencies = true
 exact = true
 root_module = "forbid"
 
-[rules]
-unused_ignore_directives = "error"
-
 ##### LAYERS #####
 # Ordered high → low: a layer may import lower layers, importing upward fails.
 layers = ["api", "pipelines", "adapters", "core"]
+
+[rules]
+unused_ignore_directives = "error"
 
 ##### MODULES #####
 [[modules]]

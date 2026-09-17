@@ -1,0 +1,9 @@
+##### SERVICES #####
+services:
+  e-api:
+    build: .
+    ports:
+      - "${PORT:-8000}:8000"
+    env_file:
+      - path: .env
+        required: false
