@@ -1,0 +1,40 @@
+server:
+  host: 0.0.0.0
+  port: 45150
+  alias: ellm
+
+model:
+  path: ''           # set to your model filename in /data/models
+  n_gpu_layers: -1   # all layers to GPU
+
+context:
+  ctx_size: 196608   # 192K — q4_0 KV fits 24GB VRAM with 30B model
+  parallel: 1
+  batch_size: 8192
+  ubatch_size: 4096
+
+cache:
+  type_k: q4_0       # compressed KV — max context at low quality cost
+  type_v: q4_0
+  no_kv_offload: false
+  defrag_thold: 0.1
+
+compute:
+  threads: 14        # i9-14900K P-cores only
+  threads_batch: 32
+  flash_attn: true
+  fit: true
+  mlock: true
+  no_mmap: false
+
+sampling:
+  temp: 0.7
+  top_p: 0.8         # Qwen3-Coder recommended
+  top_k: 20          # Qwen3-Coder recommended
+  min_p: 0.0
+  repeat_penalty: 1.05
+
+template:
+  jinja: true        # required for correct tool calling
+  no_context_shift: false
+  chat_template: ''

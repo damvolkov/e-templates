@@ -1,0 +1,333 @@
+# stack — PLANTILLA ABSOLUTA de compose.yml
+# Copiar a stack/<categoria>/<servicio>/compose.yml y podar lo que no uses.
+# Cada bloque muestra la forma CANONICA; los campos con `# alt:` tienen sintaxis alternativa.
+# Valores: FAKES. Sustituye TODO lo marcado <...> y los `example`.
+# Validar: docker compose -f compose.yml config   (esta plantilla debe pasar el parseo)
+
+# Nombre del proyecto (prefijo de recursos). alt: por env COMPOSE_PROJECT_NAME
+name: stack-example
+
+# include:                      # componer otros compose (absorb networks/volumes)
+#   - path/to/otro-compose.yml
+
+services:
+
+  # ────────────────────────────────────────────────────────────────
+  # Servicio principal: cubre el maximo de campos posibles
+  # ────────────────────────────────────────────────────────────────
+  app:
+    # --- Imagen / build (build gana si ambos) ---
+    image: example/app:latest
+    # alt (imagen local ya construida, no tirar de registry):
+    #   image: example/app
+    build:
+      context: .
+      dockerfile_inline: |            # evita exigir un Dockerfile en disco
+        FROM scratch
+      # dockerfile: Dockerfile        # alt: fichero concreto
+      # target: runtime               # multi-stage
+      # pull: true                    # actualizar base antes de build
+      # no_cache: true
+      # platform: linux/amd64
+      args:
+        BUILD_GID: "1000"
+      labels:
+        com.example.team: platform
+      cache_from:
+        - example/app:buildcache
+      secrets:                        # secrets disponibles en build
+        - mysecret
+      ssh:
+        - default
+
+    platform: linux/amd64             # ej. linux/amd64, linux/arm64/v8
+    pull_policy: always               # alt: missing|never|build|always
+
+    # --- Identidad / ciclo de vida ---
+    container_name: app
+    hostname: app
+    domainname: stack.local
+    restart: unless-stopped           # alt: no|always|on-failure[:N]|unless-stopped
+    init: true                        # PID 1 zombie-reaper
+    stop_signal: SIGTERM
+    stop_grace_period: 30s
+    profiles: ["app"]                 # levantar solo con --profile app
+
+    # --- Comando ---
+    entrypoint: ["/usr/bin/tini", "--"]
+    # alt string: "/usr/bin/tini --"
+    command: ["sleep", "infinity"]
+    # alt string: "sleep infinity"
+    working_dir: /srv/app
+    user: "1000:1000"                 # uid:gid
+    # user: root
+    group_add:
+      - audio
+      - "998"
+    privileged: false
+    read_only: false                  # rootfs de solo lectura
+
+    # --- Variables / ficheros de entorno ---
+    environment:                      # forma LISTA
+      - APP_ENV=production
+      - DB_PASSWORD=${DB_PASSWORD:?required}   # `:?` = obligatorio
+      - LOG_LEVEL
+    # alt forma MAPA (leible, soporta multilineas):
+    # environment:
+    #   APP_ENV: production
+    env_file:
+      - .env
+    # alt: { path: .env, required: false }
+    secrets:
+      - mysecret
+    configs:
+      - myconfig
+
+    # --- Red ---
+    networks:                         # red compartida con los demas servicios
+      stack-net:
+        aliases:
+          - app-alias
+        priority: 100
+        ipv4_address: 172.31.250.10   # requiere ipam del network
+      # alt (forma corta): networks: [stack-net]
+    dns:
+      - 1.1.1.1
+    dns_search:
+      - stack.local
+    dns_opt:
+      - ndots:2
+    extra_hosts:
+      - "db.example.com:172.31.250.20"
+    # network_mode: host              # MUTUO EXCLUSIVO con `networks`
+    # network_mode: "service:sidecar"
+    # network_mode: "container:xyz"
+
+    # --- Puertos ---
+    ports:
+      - name: http                    # forma LARGA (recomendada)
+        host_ip: 127.0.0.1
+        target: 80
+        published: "8080"
+        protocol: tcp
+        mode: host
+      # alt forma CORTA:
+      # - "8080:80"
+      # - "8080:80/udp"
+      # - "127.0.0.1:8080:80"
+      - "9000-9010:9000-9010"
+      - target: 5000
+        published: "5000"
+        protocol: udp
+        mode: host
+    expose:
+      - "7000"
+      - "7001/tcp"
+
+    # --- Volumenes ---
+    volumes:
+      - type: bind                    # forma LARGA
+        source: ./data
+        target: /var/lib/data
+        read_only: false
+        bind:
+          create_host_path: true
+          selinux: z
+          propagation: rprivate
+      # alt forma CORTA:
+      # - ./data:/var/lib/data:ro
+      # - named-vol:/var/lib/data:rw
+      - db-store:/var/lib/postgresql/data
+      - type: volume
+        source: cache-vol
+        target: /tmp/cache
+        volume:
+          nocopy: true
+      - type: tmpfs
+        source: tmpfs-vol
+        target: /dev/shm
+        tmpfs:
+          size: 268435456
+    tmpfs:
+      - /run
+      - /tmp:size=64m,mode=1777
+    shm_size: 1gb
+    devices:                          # acceso a nodos de /dev
+      - /dev/bus/usb
+    device_cgroup_rules:
+      - "c 189:* rmw"
+
+    # --- Aislamiento / hardening ---
+    cap_add:
+      - NET_BIND_SERVICE
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=unconfined
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 2048
+      core:
+        soft: 0
+        hard: 0
+    sysctls:
+      net.ipv4.ip_forward: 1
+      net.ipv6.conf.all.disable_ipv6: "0"
+    oom_kill_disable: false
+    oom_score_adj: -500
+
+    # --- Runtime / namespaces ---
+    runtime: runc                     # p. ej. nvidia para GPU
+    ipc: host                         # alt: private|shareable|container:id
+    pid: host                         # alt: private|container:id
+    isolation: default                # windows-only
+
+    # --- Observabilidad ---
+    labels:
+      stack.category: "api"
+      stack.port: "8080"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:80/health"]
+      # alt CMD-SHELL: test: "curl -sf http://localhost/health || exit 1"
+      # alt none:      disable: true
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+      start_interval: 5s              # frecuencia durante start_period
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # --- GPU (runtime nvidia o device_ids) ---
+    # deploy.resources.reservations.devices (forma portatil), ver deploy abajo.
+    # alt rapida con runtime: nvidia + NVIDIA_* env vars.
+
+    # --- Dependencias ---
+    depends_on:
+      sidecar:                        # forma LARGA (condiciones)
+        condition: service_healthy
+        restart: true
+        required: true
+      # alt forma CORTA: depends_on: [sidecar]
+      #   condition: service_started | service_healthy | service_completed_successfully
+      #     required: true | false
+
+    # --- Deploy (limitas, colocacion, resiliencia; aplica acompose y swarm) ---
+    deploy:
+      mode: replicated                # alt: global
+      replicas: 2
+      # endpoint_mode: dnsrr
+      labels:
+        tier: backend
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: stop-first
+      rollback_config:
+        parallelism: 1
+        order: stop-first
+      restart_policy:
+        condition: any                # alt: none|on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      placement:
+        constraints:
+          - node.role == manager
+        preferences:
+          - spread: node.labels.zone
+        max_replicas_per_node: 1
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 512M
+          pids: 100
+        reservations:
+          cpus: "0.5"
+          memory: 128M
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+    # --- Interactive ---
+    stdin_open: true
+    tty: true
+    # console_size:
+    #   width: 120
+    #   height: 30
+    # credential_spec:                 # gMSA (windows)
+    #   config: my_credential_spec
+    #   registry:
+    #     "cn=groupmsa,dc=example,dc=com": gMSA账户名
+
+  # ────────────────────────────────────────────────────────────────
+  # Servicio de apoyo: muestra `extends`, dependencias completas
+  # ────────────────────────────────────────────────────────────────
+  sidecar:
+    image: example/sidecar:latest
+    container_name: sidecar
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "true"]
+      interval: 10s
+      timeout: 2s
+      retries: 2
+    networks:
+      - stack-net
+
+  # extends: hereda de otro compose/servicio y lo sobrescribe
+  # cron:
+  #   extends:
+  #     file: base.yml
+  #     service: app
+  #   image: example/cron:latest
+  #   command: ["echo", "tick"]
+
+# ──────────────────────────────────────────────────────────────────
+# Recursos compartidos a nivel de fichero
+# ──────────────────────────────────────────────────────────────────
+volumes:
+  db-store:                           # volume gestionado por docker
+  cache-vol:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /tmp/cache
+  tmpfs-vol:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=128m
+
+networks:
+  stack-net:
+    name: stack                       # nombre real en el host (compartible entre stacks)
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "true"
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.31.250.0/24
+          ip_range: 172.31.250.128/25
+          gateway: 172.31.250.1
+    # alt (red externa preexistente): external: true   (o name: stack con external)
+
+configs:
+  myconfig:
+    external: true                    # existe ya (docker config create ...) ; evita fichero en disco
+    name: stack_example_config
+
+secrets:
+  mysecret:
+    external: true                    # docker secret create ...
+    name: stack_example_secret

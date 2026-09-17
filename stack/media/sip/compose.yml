@@ -1,0 +1,28 @@
+services:
+  sip:
+    image: livekit/sip:latest
+    container_name: sip
+    hostname: sip
+    restart: unless-stopped
+    labels:
+      stack.category: "media"
+      stack.port: "5060"
+    # Red host: el gateway SIP necesita UDP/RTP directo y escucha 5060 en el host.
+    # Llegara a redis (cdb) y livekit por los puertos publicados en localhost.
+    network_mode: host
+    environment:
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-secret}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
+      LIVEKIT_WS_URL: ${LIVEKIT_WS_URL:-ws://localhost:7880}
+      SIP_CONFIG_BODY: |
+        log_level: debug
+        api_key: ${LIVEKIT_API_KEY:-devkey}
+        api_secret: ${LIVEKIT_API_SECRET:-secret}
+        ws_url: ${LIVEKIT_WS_URL:-ws://localhost:7880}
+        redis:
+          address: localhost:6379
+          password: ${REDIS_PASSWORD:-redis_password}
+        sip_port: 5060
+        rtp_port: 10000-20000
+        use_external_ip: true

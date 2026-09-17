@@ -1,0 +1,41 @@
+services:
+  kokoro:
+    image: ghcr.io/remsky/kokoro-fastapi-gpu:latest
+    container_name: kokoro
+    hostname: kokoro
+    restart: unless-stopped
+    runtime: nvidia
+    labels:
+      stack.category: "speech"
+      stack.port: "8880"
+    ports:
+      # TTS Kokoro (OpenAI-compatible)
+      - "${TTS_PORT:-8880}:8880"
+    volumes:
+      - kokoro-voices:/app/voices
+    environment:
+      - OUTPUT_FORMAT=mp3
+      - DEFAULT_VOICE=${TTS_DEFAULT_VOICE:-af_heart}
+      - USE_GPU=true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8880/v1/models || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - stack
+
+volumes:
+  kokoro-voices:
+
+networks:
+  stack:
+    name: stack

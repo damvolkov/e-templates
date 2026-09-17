@@ -1,0 +1,63 @@
+services:
+  llamacpp:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: llamacpp
+    hostname: llamacpp
+    restart: unless-stopped
+    ipc: host
+    labels:
+      stack.category: "llm"
+      stack.port: "8080"
+    ports:
+      # default 8080 — llama.cpp OpenAI-compatible server
+      - "${LLAMACPP_PORT:-8080}:8080"
+    volumes:
+      - llamacpp-models:/models
+      - llamacpp-cache:/root/.cache/llama.cpp
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, compute, utility]
+    # setup.sh descarga el GGUF a /models antes de levantar el server
+    command: >-
+      --model /models/Qwen3-Coder-Next-UD-Q4_K_XL.gguf
+      --alias ${LLAMACPP_MODEL_ALIAS:-qwen3-coder-next}
+      --host 0.0.0.0
+      --port 8080
+      --jinja
+      --flash-attn on
+      --fit on
+      --no-kv-offload
+      --cache-type-k q8_0
+      --cache-type-v q8_0
+      --parallel 2
+      --ctx-size ${LLAMACPP_CTX_SIZE:-65536}
+      --threads ${LLAMACPP_THREADS:-20}
+      --threads-batch ${LLAMACPP_THREADS_BATCH:-26}
+      --temp 1.0
+      --top-p 0.95
+      --top-k 40
+      --min-p 0.01
+      --no-context-shift
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
+    networks:
+      - stack
+
+volumes:
+  llamacpp-models:
+  llamacpp-cache:
+
+networks:
+  stack:
+    name: stack

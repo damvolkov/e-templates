@@ -1,0 +1,32 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    hostname: qdrant
+    restart: unless-stopped
+    labels:
+      stack.category: "vdb"
+      stack.port: "6333"
+    ports:
+      # default 6333 HTTP / 6334 gRPC
+      - "${QDRANT_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - ./config.yaml:/qdrant/config/config.yaml:ro
+      - qdrant-storage:/qdrant/storage
+      - qdrant-snapshots:/qdrant/snapshots
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/6333'"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - stack
+
+volumes:
+  qdrant-storage:
+  qdrant-snapshots:
+
+networks:
+  stack:
+    name: stack

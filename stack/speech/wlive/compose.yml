@@ -1,0 +1,40 @@
+services:
+  wlive:
+    image: ghcr.io/collabora/whisperlive-gpu:latest
+    container_name: wlive
+    hostname: wlive
+    restart: unless-stopped
+    runtime: nvidia
+    labels:
+      stack.category: "speech"
+      stack.port: "9090"
+    ports:
+      # STT WhisperLive (streaming)
+      - "${STT_PORT:-9090}:9090"
+    volumes:
+      - wlive-cache:/root/.cache/huggingface
+    environment:
+      - WHISPER_MODEL=${WLIVE_WHISPER_MODEL:-large-v3-turbo}
+      - PROVIDER=cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import asyncio,websockets; asyncio.run(websockets.connect('ws://localhost:9090').__aenter__())"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks:
+      - stack
+
+volumes:
+  wlive-cache:
+
+networks:
+  stack:
+    name: stack

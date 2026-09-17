@@ -1,0 +1,49 @@
+/* Eager corporate theme — dark base with cyan accents */
+:root {
+    --primary-color: #2196f3;
+    --accent-color: #1a6e8a;
+}
+
+/* Sidebar */
+#sidebar {
+    background-color: #0a0e14 !important;
+    border-right: 1px solid #1a3a4a !important;
+}
+
+/* Main background */
+.app, main, .relative {
+    background-color: #0d1117 !important;
+}
+
+/* Send button */
+#send-message-button {
+    background-color: #2196f3 !important;
+    border-radius: 10px !important;
+}
+
+/* Submit buttons */
+button[type="submit"], .primary-btn {
+    background-color: #2196f3 !important;
+    border-radius: 8px !important;
+}
+
+/* Input fields */
+textarea, input[type="text"] {
+    border-radius: 10px !important;
+}
+
+/* Cards and panels */
+.card, .panel {
+    border-radius: 12px !important;
+    border: 1px solid #1a3a4a !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar-thumb {
+    background-color: #1a6e8a !important;
+    border-radius: 4px !important;
+}
+
+::-webkit-scrollbar-track {
+    background-color: #0a0e14 !important;
+}

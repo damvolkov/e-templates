@@ -1,0 +1,44 @@
+services:
+  speaches:
+    image: ghcr.io/speaches-ai/speaches:latest-cuda
+    container_name: speaches
+    hostname: speaches
+    restart: unless-stopped
+    entrypoint: ["/entrypoint/entrypoint.sh"]
+    labels:
+      stack.category: "speech"
+      stack.port: "8000"
+    ports:
+      # STT + TTS unificados
+      - "${SPEACHES_PORT:-8000}:8000"
+    volumes:
+      - speaches-cache:/home/ubuntu/.cache/huggingface/hub
+      - ./entrypoint.sh:/entrypoint/entrypoint.sh:ro
+    environment:
+      - WHISPER__MODEL=${SPEACHES_WHISPER_MODEL:-deepdml/faster-whisper-large-v3-turbo-ct2}
+      - TTS_MODEL=${SPEACHES_TTS_MODEL:-speaches-ai/Kokoro-82M-v1.0-ONNX}
+      - STT_MODEL_TTL=${SPEACHES_STT_MODEL_TTL:--1}
+      - TTS_MODEL_TTL=${SPEACHES_TTS_MODEL_TTL:--1}
+      - LOG_LEVEL=info
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks:
+      - stack
+
+volumes:
+  speaches-cache:
+
+networks:
+  stack:
+    name: stack

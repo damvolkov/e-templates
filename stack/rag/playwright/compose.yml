@@ -1,0 +1,31 @@
+services:
+  playwright:
+    image: mcr.microsoft.com/playwright:latest
+    container_name: playwright
+    hostname: playwright
+    restart: unless-stopped
+    labels:
+      stack.category: "rag"
+      stack.port: "3000"
+    ports:
+      # Playwright server — web loader
+      - "${PLAYWRIGHT_PORT:-3000}:3000"
+    volumes:
+      - playwright-cache:/home/pwuser/.cache/ms-playwright
+    command: >-
+      /bin/sh -c "npx -y playwright run-server --port 3000 --host 0.0.0.0"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/3000'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    networks:
+      - stack
+
+volumes:
+  playwright-cache:
+
+networks:
+  stack:
+    name: stack

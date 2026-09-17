@@ -1,0 +1,44 @@
+services:
+  ellm:
+    image: ghcr.io/damvolkov/e-llm:latest
+    container_name: ellm
+    hostname: ellm
+    restart: unless-stopped
+    cap_add:
+      - IPC_LOCK
+    labels:
+      stack.category: "llm"
+      stack.port: "80"
+    ports:
+      # e-llm GUI + OpenAI API, escucha en 80
+      - "${ELLM_PORT:-80}:80"
+    volumes:
+      - ellm-models:/data/models
+      - ellm-cache:/data/cache
+      - ./config.yaml:/data/config/config.yaml:ro
+    environment:
+      - DATA_DIR=/data
+      - LLAMA_ARG_REASONING=off
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, compute, utility]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
+    networks:
+      - stack
+
+volumes:
+  ellm-models:
+  ellm-cache:
+
+networks:
+  stack:
+    name: stack

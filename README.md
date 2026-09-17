@@ -39,3 +39,12 @@ make up             # docker compose up
 ```
 
 `make` alone lists every target.
+
+##### CI #####
+
+`.github/workflows/docs.yml` builds the site with `properdocs build --strict` and deploys it to GitHub Pages. It is **inert by default** (pages publishing doesn't apply to every project), so it ships disabled. To turn it on for a repo:
+
+1. Set the Actions variable `DOCS_DEPLOY=true` — Settings → Secrets and variables → Actions → Variables.
+2. Point Pages source to **GitHub Actions** — Settings → Pages → Build and deployment.
+
+The workflow is generic to the repo name (no hardcoded project string): the Pages URL is the deployment's own output, and `site_url` in `properdocs.yml` is rewritten by `make init`.

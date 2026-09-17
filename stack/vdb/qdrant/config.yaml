@@ -1,0 +1,19 @@
+# e-core Qdrant default config
+log_level: INFO
+
+service:
+  host: 0.0.0.0
+  http_port: 6333
+  grpc_port: 6334
+  enable_tls: false
+
+storage:
+  storage_path: /qdrant/storage
+  snapshots_path: /qdrant/snapshots
+  on_disk_payload: true
+  performance:
+    max_search_threads: 0
+    max_optimization_threads: 0
+
+cluster:
+  enabled: false

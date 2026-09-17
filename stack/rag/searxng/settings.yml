@@ -1,0 +1,38 @@
+use_default_settings: true
+
+general:
+  instance_name: "SearXNG_Local"
+  debug: false
+  enable_metrics: true
+
+search:
+  safe_search: 0
+  autocomplete: "google"
+  autocomplete_min: 4
+  default_lang: "auto"
+  formats:
+    - html
+    - json
+
+server:
+  port: 8080
+  bind_address: "0.0.0.0"
+  secret_key: "ultrasecretkey123"
+  limiter: false
+  image_proxy: true
+
+redis:
+  url: "redis://:redis_password@redis:6379/0"
+
+ui:
+  static_use_hash: true
+  default_theme: simple
+  theme_args:
+    simple_style: dark
+
+outgoing:
+  request_timeout: 5.0
+  max_request_timeout: 15.0
+  useragent_suffix: ""
+  pool_connections: 100
+  pool_maxsize: 20

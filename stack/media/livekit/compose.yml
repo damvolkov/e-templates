@@ -1,0 +1,32 @@
+services:
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: livekit
+    hostname: livekit
+    restart: unless-stopped
+    labels:
+      stack.category: "media"
+      stack.port: "7880"
+    command: --config /etc/livekit.yaml
+    ports:
+      # default 7880 signal / 7881 rtc-tcp / 50100-50150 rtc-udp
+      - "${LIVEKIT_PORT:-7880}:7880"
+      - "7881:7881/udp"
+      - "50100-50150:50100-50150/udp"
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    environment:
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-secret}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis_password}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:7880"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stack
+
+networks:
+  stack:
+    name: stack

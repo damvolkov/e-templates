@@ -1,0 +1,39 @@
+services:
+  evoice:
+    image: ghcr.io/damvolkov/e-voice:latest
+    container_name: evoice
+    hostname: evoice
+    restart: unless-stopped
+    labels:
+      stack.category: "speech"
+      stack.port: "80"
+    ports:
+      # e-voice STT + TTS unificados, escucha en 80
+      - "${EVOICE_PORT:-80}:80"
+    volumes:
+      - evoice-models:/app/data/models
+      - ./config.yaml:/app/data/config/config.yaml:ro
+    environment:
+      - LOG_LEVEL=${EVOICE_LOG_LEVEL:-info}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks:
+      - stack
+
+volumes:
+  evoice-models:
+
+networks:
+  stack:
+    name: stack

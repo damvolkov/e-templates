@@ -1,0 +1,37 @@
+services:
+  embed:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-latest
+    container_name: embed
+    hostname: embed
+    restart: unless-stopped
+    labels:
+      stack.category: "llm"
+      stack.port: "80"
+    ports:
+      # TEI escucha por defecto en 80
+      - "${EMBED_PORT:-80}:80"
+    volumes:
+      - embed-data:/data
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
+    command: >-
+      --model-id ${EMBED_MODEL:-Qwen/Qwen3-Embedding-0.6B}
+      --port 80
+      --max-batch-tokens ${EMBED_MAX_BATCH:-1024}
+      --max-client-batch-size 8
+      --max-concurrent-requests 8
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:80/health || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    networks:
+      - stack
+
+volumes:
+  embed-data:
+
+networks:
+  stack:
+    name: stack

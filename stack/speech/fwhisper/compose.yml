@@ -1,0 +1,38 @@
+services:
+  fwhisper:
+    image: fedirz/faster-whisper-server:latest-cuda
+    container_name: fwhisper
+    hostname: fwhisper
+    restart: unless-stopped
+    labels:
+      stack.category: "speech"
+      stack.port: "8000"
+    ports:
+      # STT Faster-Whisper server
+      - "${STT_PORT:-8000}:8000"
+    volumes:
+      - fwhisper-cache:/root/.cache/huggingface
+    environment:
+      - WHISPER__MODEL=${FWHISPER_WHISPER_MODEL:-deepdml/faster-whisper-large-v3-turbo-ct2}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks:
+      - stack
+
+volumes:
+  fwhisper-cache:
+
+networks:
+  stack:
+    name: stack

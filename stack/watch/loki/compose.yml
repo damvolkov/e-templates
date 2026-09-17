@@ -1,0 +1,23 @@
+services:
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    hostname: loki
+    restart: unless-stopped
+    labels:
+      stack.category: "watch"
+      stack.port: "3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/loki
+    ports:
+      - "${LOKI_PORT:-3100}:3100"
+    networks:
+      - stack
+
+volumes:
+  loki-data:
+
+networks:
+  stack:
+    name: stack

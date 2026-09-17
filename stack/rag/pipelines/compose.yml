@@ -1,0 +1,31 @@
+services:
+  pipelines:
+    image: ghcr.io/open-webui/pipelines:latest
+    container_name: pipelines
+    hostname: pipelines
+    restart: unless-stopped
+    labels:
+      stack.category: "rag"
+      stack.port: "9099"
+    ports:
+      # OpenWebUI Pipelines — orquestacion RAG
+      - "${PIPELINES_PORT:-9099}:9099"
+    volumes:
+      - pipelines-data:/app/pipelines
+    environment:
+      - PIPELINES_API_KEY=${PIPELINES_API_KEY:-0p3n-w3bu!}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9099/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - stack
+
+volumes:
+  pipelines-data:
+
+networks:
+  stack:
+    name: stack

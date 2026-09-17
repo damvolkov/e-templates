@@ -1,0 +1,28 @@
+services:
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    hostname: searxng
+    restart: unless-stopped
+    labels:
+      stack.category: "rag"
+      stack.port: "8080"
+    ports:
+      # SearXNG metasearch (retrieval web)
+      - "${SEARXNG_PORT:-8080}:8080"
+    volumes:
+      - ./settings.yml:/etc/searxng/settings.yml:ro
+      - ./limiter.toml:/etc/searxng/limiter.toml:ro
+    environment:
+      - SEARXNG_BASE_URL=${SEARXNG_BASE_URL:-http://localhost:8080}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - stack
+
+networks:
+  stack:
+    name: stack
