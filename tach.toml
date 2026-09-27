@@ -9,18 +9,38 @@ root_module = "forbid"
 
 ##### LAYERS #####
 # Ordered high → low: a layer may import lower layers, importing upward fails.
-layers = ["api", "pipelines", "adapters", "core"]
+layers = ["api", "adapters", "core", "models"]
 
 [rules]
 unused_ignore_directives = "error"
 
 ##### MODULES #####
 [[modules]]
-path = "e_api"
+path = "e_app"
 layer = "api"
 depends_on = []
 
 [[modules]]
-path = "e_api.core"
+path = "e_app.api"
+layer = "api"
+depends_on = []
+
+[[modules]]
+path = "e_app.websockets"
+layer = "api"
+depends_on = []
+
+[[modules]]
+path = "e_app.adapters"
+layer = "adapters"
+depends_on = []
+
+[[modules]]
+path = "e_app.core"
 layer = "core"
+depends_on = []
+
+[[modules]]
+path = "e_app.models"
+layer = "models"
 depends_on = []

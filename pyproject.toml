@@ -5,9 +5,9 @@ build-backend = "hatchling.build"
 
 ##### PROJECT #####
 [project]
-name = "e-api"
+name = "e-app"
 dynamic = ["version"]
-description = "e-stack API service: FastAPI + Pydantic on uv, Rust-backed tooling end to end"
+description = "e-stack app service: Litestar + Granian on uv, msgspec end to end, Rust-backed tooling"
 readme = "README.md"
 requires-python = ">=3.14"
 license = "MIT"
@@ -20,15 +20,33 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "fastapi[standard]>=0.141",
-    "pydantic>=2.13",
-    "pydantic-settings>=2.15",
-    "msgspec>=0.21",
+    ##### core #####
+    "litestar>=2.24",
+    "granian>=2.7",
+    "asgi-correlation-id>=5.0",
     "structlog>=26.1",
+    ##### data #####
+    "msgspec>=0.21",
+    "e-serde>=0.5.1",
+    ##### crypto #####
+    "joserfc>=1.7.5",
+    "cryptography>=50.0.1",
+    "argon2-cffi>=25.1.0",
+    "bcrypt>=5.0.0",
+    "anyio>=4.15.1",
+    ##### auth #####
+    "authlib>=1.6",
+    "httpx>=0.27",
+    ##### stores #####
+    "redis>=6.2",
+    "aiosqlite>=0.20",
 ]
 
 [project.urls]
-Homepage = "https://github.com/damvolkov"
+Homepage = "https://github.com/damvolkov/e-app"
+Source = "https://github.com/damvolkov/e-app"
+Issues = "https://github.com/damvolkov/e-app/issues"
+Changelog = "https://github.com/damvolkov/e-app/releases"
 
 ##### DEPS #####
 [dependency-groups]
@@ -50,7 +68,7 @@ test = [
     "polyfactory>=3.3",
     "inline-snapshot>=0.30",
     "hypothesis>=6.150",
-    "pyyaml>=6.0",
+    "pytest-resources[serde]>=0.3.2",
 ]
 dev = [
     { include-group = "lint" },
@@ -71,6 +89,8 @@ docs = [
 required-version = ">=0.12"
 default-groups = ["dev"]
 exclude-newer = "7 days"
+### e-serde and pytest-resources are first-party and can publish same-day; exempt only them from the freshness guard.
+exclude-newer-package = { "e-serde" = "2100-01-01T00:00:00Z", "pytest-resources" = "2100-01-01T00:00:00Z" }
 cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true, tags = true } }]
 
 ##### VERSION #####
@@ -84,7 +104,7 @@ bump = true
 fallback-version = "0.0.0"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/e_api"]
+packages = ["src/e_app"]
 
 [tool.hatch.build.targets.sdist]
 include = ["src/", "tests/", "README.md"]
@@ -108,7 +128,7 @@ ignore = ["E501", "ISC001", "PLR0913"]
 "scripts/**" = ["T20", "S603", "S607", "PTH"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["e_api"]
+known-first-party = ["e_app"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
@@ -132,7 +152,11 @@ minversion = "9.0"
 testpaths = ["tests"]
 addopts = ["--import-mode=importlib", "-ra"]
 strict = true
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    ### joserfc warns on every EdDSA JWT per RFC 9864 (non-committing signature); kept as an offered alg.
+    "ignore::joserfc.errors.SecurityWarning",
+]
 timeout = "60"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
@@ -140,7 +164,7 @@ markers = ["slow: slow tests (deselect with -m 'not slow')"]
 
 ##### COVERAGE #####
 [tool.coverage.run]
-source_pkgs = ["e_api"]
+source_pkgs = ["e_app"]
 branch = true
 parallel = true
 

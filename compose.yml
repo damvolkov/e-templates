@@ -1,11 +1,11 @@
 ##### SERVICES #####
 services:
-  e-api:
+  e-app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: e-api
-    hostname: e-api
+    container_name: e-app
+    hostname: e-app
     restart: unless-stopped
     ports:
       - "${PORT:-8000}:8000"

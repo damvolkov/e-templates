@@ -25,6 +25,16 @@ PROHIBITED: Final[frozenset[str]] = frozenset(sys.stdlib_module_names)
 
 
 ##### HELPERS #####
+GATE_RE: Final[re.Pattern[str]] = re.compile(r"^([A-Z][A-Z0-9_]*)=")
+
+
+def pending_gates(root: Path) -> list[str]:
+    """The optional CI/CD gates this repo has not enabled yet (all are, by default)."""
+    manifest = root / ".github" / "ci.vars.example"
+    names = [m.group(1) for line in manifest.read_text("utf-8").splitlines() if (m := GATE_RE.match(line))]
+    return [f"gh variable set {name} --body true" for name in names]
+
+
 def module_of(dist: str) -> str:
     return dist.replace("-", "_")
 
@@ -158,6 +168,11 @@ def main() -> None:
     print(f"   renamed: {', '.join(renamed)}")
     print(f"   rewritten: {', '.join(touched)}")
     print(f"   ready: make check | make run -> python -m {module_of(target)}")
+    print("   enable what this repo is (gates are inert until you do):")
+    for gate in pending_gates(ROOT):
+        print(f"     {gate}")
+    print("   one-time: PyPI trusted publisher (workflow release.yml) · Pages source = GitHub Actions")
+    print("   first release: make release minor   · details: docs/release.md")
 
 
 def read_prompt() -> str:

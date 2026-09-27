@@ -1,7 +1,7 @@
 ##### CONFIG #####
-PROJECT ?= e-api
-PACKAGE ?= src/e_api
-MODULE  ?= e_api
+PROJECT ?= e-app
+PACKAGE ?= src/e_app
+MODULE  ?= e_app
 PORT    ?= 8000
 COMPOSE ?= compose.yml
 ARGS     = $(filter-out $@,$(MAKECMDGOALS))
@@ -18,7 +18,7 @@ MAKEFLAGS += --no-print-directory
 export PYTHONPATH := $(CURDIR)/src
 
 ##### TARGETS #####
-.PHONY: help install sync lock lint type arch validate harden test cov benchmark docs docs-build check ci run up down build logs clean hooks init
+.PHONY: help install sync lock lint type arch validate harden test cov benchmark docs docs-build check ci run up down build logs clean hooks init release ci-vars
 
 help:
 	@printf "$(BOLD)$(CYAN)$(PROJECT)$(RESET) $(GRAY)· uv · ruff · ty · tach · pytest · properdocs · docker$(RESET)\n\n"
@@ -76,6 +76,16 @@ docs-build: ## strict docs build to site/
 # — aggregate —
 check: lint type arch validate test ## fast local gate: lint + type + arch + validate + test
 ci: lint type arch validate harden docs-build cov ## full pipeline: every gate CI runs, in one command
+
+# — release —
+release: ## cut a GitHub release via the release workflow [args: patch|minor|major]
+	@gh workflow run release.yml -f bump=$(or $(ARGS),patch)
+	@sleep 5
+	@gh run watch --exit-status $$(gh run list --workflow release.yml --limit 1 --json databaseId --jq '.[0].databaseId')
+
+ci-vars: ## list optional CI/CD gates (all inert by default) and their defaults
+	@printf "$(BOLD)optional CI/CD gates$(RESET) $(GRAY)— enable: gh variable set NAME --body true · manifest: .github/ci.vars.example$(RESET)\n\n"
+	@grep -E '^[A-Z][A-Z0-9_]*=' .github/ci.vars.example
 
 # — run —
 run: ## run app locally [args: forwarded]

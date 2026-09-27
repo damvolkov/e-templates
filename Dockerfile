@@ -14,4 +14,4 @@ ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
 COPY --from=builder /app/.venv .venv
 USER nobody
 EXPOSE 8000
-CMD ["uvicorn", "e_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["granian", "--interface", "asgi", "--host", "0.0.0.0", "--port", "8000", "e_app.main:app"]

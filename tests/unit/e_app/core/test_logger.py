@@ -1,4 +1,4 @@
-"""e_api.core.logger: renderer, serializer and startup wiring."""
+"""e_app.core.logger: renderer, serializer and startup wiring."""
 
 import io
 import json
@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from e_api.core import logger as lg
+from e_app.core import logger as lg
 
 if TYPE_CHECKING:
     from structlog.typing import EventDict, WrappedLogger
