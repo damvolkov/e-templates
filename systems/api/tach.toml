@@ -1,0 +1,51 @@
+##### ROOTS #####
+source_roots = ["src"]
+exclude = ["tests", "docs"]
+
+##### RULES #####
+forbid_circular_dependencies = true
+exact = true
+root_module = "forbid"
+
+##### LAYERS #####
+# Ordered high → low: a layer may import lower layers, importing upward fails.
+layers = ["api", "adapters", "core", "ops", "models"]
+
+[rules]
+unused_ignore_directives = "error"
+
+##### MODULES #####
+[[modules]]
+path = "e_api"
+layer = "api"
+depends_on = ["e_api.api", "e_api.websockets"]
+
+[[modules]]
+path = "e_api.api"
+layer = "api"
+depends_on = []
+
+[[modules]]
+path = "e_api.websockets"
+layer = "api"
+depends_on = ["e_api.api"]
+
+[[modules]]
+path = "e_api.adapters"
+layer = "adapters"
+depends_on = []
+
+[[modules]]
+path = "core"
+layer = "core"
+depends_on = []
+
+[[modules]]
+path = "ops"
+layer = "ops"
+depends_on = []
+
+[[modules]]
+path = "e_api.models"
+layer = "models"
+depends_on = []
