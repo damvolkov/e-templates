@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 [project]
 name = "e-core"
 dynamic = ["version"]
-description = "e-stack common core: layered settings composer, structured logger, crypto engine, state, ops file discovery"
+description = "e-stack common core: layered settings composer, structured logger, crypto engine, state, ops file discovery, service adapters"
 requires-python = ">=3.14"
 license = "MIT"
 authors = [{ name = "damvolkov", email = "damvolkovv@gmail.com" }]
@@ -29,8 +29,15 @@ dependencies = [
     "argon2-cffi>=25.1.0",
     "bcrypt>=5.0.0",
     "anyio>=4.15.1",
+    ##### stores #####
+    "redis>=6.2",
+    "aiosqlite>=0.20",
+    ##### http #####
+    "wreq>=0.10",
     ##### contracts #####
     "beartype>=0.22.9",
+    ##### tui #####
+    "textual>=8.2",
 ]
 
 [project.urls]
@@ -54,6 +61,7 @@ test = [
     "pytest-xdist[psutil]>=3.8",
     "pytest-randomly>=5.0",
     "pytest-timeout>=2.4",
+    "fakeredis>=2.38.0",
 ]
 docs = [
     "mkdocs-gen-files>=0.6.1",

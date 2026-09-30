@@ -1,6 +1,6 @@
 """core/state: the app resource graph — dynamic attribute access all the way down.
 
-Shape is created by referencing it: `state.adapters.sqlite = SQLiteAdapter()`, even
+Shape is created by referencing it: `state.adapters.store = SQLiteAdapter()`, even
 `state.buses.events.sinks = []` from zero — reading an unset node auto-vivifies an empty child
 `State` that stays in the tree. After `seal()` (the lifespan chain's last act) the graph is
 strict: no writes anywhere, and a typo on read raises instead of silently growing a node. The
@@ -15,20 +15,23 @@ from typing import Any
 
 
 ##### TYPES #####
-class State(MutableMapping[str, Any]):
-    """A node of the graph: attribute- and item-access to a dict that deepens on demand while open."""
+class State(MutableMapping[str, object]):
+    """A node of the graph: attribute- and item-access to a dict that deepens on demand while open.
+
+    The attribute surface (`__getattr__`) stays dynamic `Any` — auto-vivification is its contract;
+    the mapping surface yields `object`, and consumers cast or narrow at the use site."""
 
     __slots__ = ("_nodes", "_sealed")
 
-    def __init__(self, **nodes: Any) -> None:
+    def __init__(self, **nodes: object) -> None:
         object.__setattr__(self, "_nodes", dict(nodes))
         object.__setattr__(self, "_sealed", False)
 
     ##### MAPPING CORE #####
-    def __getitem__(self, name: str) -> Any:
+    def __getitem__(self, name: str) -> object:
         return self._nodes[name]
 
-    def __setitem__(self, name: str, value: Any) -> None:
+    def __setitem__(self, name: str, value: object) -> None:
         self._check_writable()
         self._nodes[name] = value
 
@@ -57,7 +60,7 @@ class State(MutableMapping[str, Any]):
                     child = self._nodes[name] = State()
                     return child
 
-    def __setattr__(self, name: str, value: Any) -> None:
+    def __setattr__(self, name: str, value: object) -> None:
         self._check_writable()
         self._nodes[name] = value
 

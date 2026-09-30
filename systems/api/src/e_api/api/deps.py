@@ -6,7 +6,8 @@ wires the chains it uses in a local `dependencies` mapping, and the app itself r
 Links run once per request, in resolved order; independent links run concurrently.
 """
 
-from typing import Any, cast
+from enum import StrEnum, auto
+from typing import cast
 
 import msgspec
 from asgi_correlation_id import correlation_id as correlation_id_var
@@ -15,12 +16,23 @@ from litestar.connection import Request
 from litestar.di import NamedDependency
 from litestar.exceptions import NotAuthorizedException
 
+from adapters.ports import StorePort
 from core.state import State
-from e_api.adapters.base import StoreAdapter
 from e_api.api.security import bearer_claims
 from e_api.models.user import User, UserRecord
 
 USER_KEY: str = "user:"
+
+type ClaimValue = str | int | float | list[str] | None
+
+
+##### DEPENDENCY KEYS — the wiring vocabulary: a typo is an attribute error at import, never a silent runtime miss #####
+class DepKey(StrEnum):
+    GRAPH = auto()
+    STORE = auto()
+    CURRENT_USER = auto()
+    CORRELATION_ID = auto()
+    OAUTH = auto()
 
 
 ##### LINKS — each names its injection parameter and consumes other links by name #####
@@ -34,16 +46,16 @@ def oauth(graph: NamedDependency[State]) -> OAuth:
     return graph.oauth
 
 
-def store(graph: NamedDependency[State]) -> StoreAdapter:
+def store(graph: NamedDependency[State]) -> StorePort:
     """The KV edge the user records live on; swap scope here to send a route elsewhere. Chain: graph."""
-    return graph.adapters.sqlite
+    return graph.adapters.store
 
 
-async def current_user(request: Request, store: NamedDependency[StoreAdapter]) -> User:
+async def current_user(request: Request, store: NamedDependency[StorePort]) -> User:
     """The placeholder authz: bearer claims (guard already verified) mapped to a live `User`.
 
     Chain: request + store. Swap the lookup for the real session when it exists."""
-    claims: dict[str, Any] = bearer_claims(request)
+    claims: dict[str, ClaimValue] = bearer_claims(request)
     match await load_record(store, str(claims.get("sub", ""))):
         case None:
             raise NotAuthorizedException(detail="Unknown subject")
@@ -57,7 +69,13 @@ def correlation_id() -> str:
 
 
 ##### HELPERS — shared by handlers and links, never injected #####
-async def load_record(store: StoreAdapter, user_id: str) -> UserRecord | None:
+def registered_providers(oauth: OAuth) -> list[str]:
+    """Sorted identities registered with authlib: the single public read edge over its private registry."""
+    ### authlib exposes no public accessor for `_registry`; leaking it to routers would spread the coupling, it stops here.
+    return sorted(oauth._registry)
+
+
+async def load_record(store: StorePort, user_id: str) -> UserRecord | None:
     """Single point where a user is read from the KV store; None means gone."""
     raw = await store.get(f"{USER_KEY}{user_id}")
     return None if raw is None else msgspec.json.decode(raw, type=UserRecord)

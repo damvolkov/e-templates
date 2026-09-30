@@ -2,13 +2,15 @@
 
 Each subsystem keeps its own sources (``env_prefix``, ``config_file``, ``secrets_dir``), so adding a
 scope is just dropping a file here — ``__init__`` and ``base`` are the only things skipped.
-Consumers import the loaded singleton: ``from e_core.core.settings import settings as st`` → ``st.crypto.alg``."""
+Consumers import the lazy singleton: ``from e_core.core.settings import settings as st`` → ``st.crypto.alg``
+(env, secrets and ``.env`` are read on that first access, never at import)."""
 
 import re
 from typing import Any
 
 import msgspec
 
+from e_core.core.proxy import LazyProxy
 from e_core.core.settings.base import (
     DOTENV,
     DOTENV_QUOTES,
@@ -49,7 +51,8 @@ Settings: Any = msgspec.defstruct(
 )
 
 
-def _load(cls: type, **overrides: dict[str, Any]) -> Any:
+### PEP 695 generic instead of `Self`: the loader is module-level, wired as `Settings.load` below — same contract as `Crypto.load`.
+def _load[S](cls: type[S], **overrides: Any) -> S:
     """Build the composite by loading every subsystem from its own sources, then wiring the pieces."""
     parts = {scope: sub.load(**overrides.pop(scope, {})) for scope, sub in _SCOPES.items()}
     return cls(**parts, **overrides)
@@ -57,4 +60,5 @@ def _load(cls: type, **overrides: dict[str, Any]) -> Any:
 
 ### the flat base loader cannot honour a per-subsystem config_file: each scope loads itself.
 Settings.load = classmethod(_load)  # type: ignore[method-assign]
-settings: Any = _load(Settings)
+### no I/O at import: env, secrets and .env are read on the first attribute access, once per process.
+settings: LazyProxy[Any] = LazyProxy(lambda: _load(Settings))

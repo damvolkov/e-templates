@@ -31,7 +31,7 @@ layer = "api"
 depends_on = ["e_api.api"]
 
 [[modules]]
-path = "e_api.adapters"
+path = "adapters"
 layer = "adapters"
 depends_on = []
 

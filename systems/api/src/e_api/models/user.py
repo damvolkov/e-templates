@@ -52,7 +52,7 @@ class UserCreate(msgspec.Struct, frozen=True, kw_only=True, forbid_unknown_field
         if self.quota < 0:
             msg = "quota cannot be negative"
             raise ValueError(msg)
-        # msgspec decodes plain str (it refuses str->subclass coercion); the object upgrades itself here.
+        ### msgspec decodes plain str (it refuses str->subclass coercion); the object upgrades itself here.
         object.__setattr__(self, "password", Password(self.password))
 
 

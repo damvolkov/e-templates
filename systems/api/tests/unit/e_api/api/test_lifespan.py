@@ -1,4 +1,4 @@
-"""tests/unit: the lifespan contract — exit stack opens, seals, and closes in reverse."""
+"""tests/unit: the lifespan contract — core loaded once, edges opened as typed ports, graph sealed last."""
 
 import inspect
 from types import SimpleNamespace
@@ -7,9 +7,16 @@ from typing import TYPE_CHECKING, cast
 import pytest
 from litestar.testing import TestClient
 
+from adapters.ports import HttpPort, StorePort
+from core.logger import logger
 from core.settings import Settings
+from core.settings import settings as st
 from core.state import State
+from e_api.api.deps import registered_providers
 from e_api.api.lifespan import adapters, sealed, services
+from e_api.api.lifespan.adapters import AdaptersState
+from e_api.api.lifespan.core import CoreState
+from e_api.api.lifespan.core import lifespan as core_lifespan
 from e_api.main import create_app
 
 if TYPE_CHECKING:
@@ -17,20 +24,38 @@ if TYPE_CHECKING:
 
 
 def test_lifespans_are_declared_not_built() -> None:
-    assert all(callable(cm) for cm in (adapters.lifespan, services.lifespan, sealed.lifespan))
+    assert all(callable(cm) for cm in (core_lifespan, adapters.lifespan, services.lifespan, sealed.lifespan))
     assert list(inspect.signature(create_app).parameters) == []
 
 
-def test_graph_carries_the_three_edges(client) -> None:
-    adapters = client.app.state.adapters
-    assert sorted(adapters) == ["http", "redis", "sqlite"]
-    assert adapters.sqlite.name == "sqlite"
+def test_core_section_holds_the_loaded_singletons(client) -> None:
+    core = client.app.state.core
+    assert isinstance(core, CoreState)
+    assert core.settings is st
+    assert core.logger is logger
+
+
+def test_singleton_load_is_idempotent(client) -> None:
+    """Two touches, one instance: the LazyProxy cache pins the build for the whole process."""
+    ### the graph section is the same object a global import reaches, and a second touch reuses the one build.
+    assert client.app.state.core.settings.app is st.app
+    assert st.app is st.app
+
+
+def test_adapters_section_is_typed_and_ported(client) -> None:
+    edges = client.app.state.adapters
+    assert isinstance(edges, AdaptersState)
+    assert isinstance(edges.store, StorePort)
+    assert isinstance(edges.redis, StorePort)
+    assert isinstance(edges.http, HttpPort)
+    assert edges.store.name == "sqlite"
+    assert edges.redis.name == "redis"
+    assert edges.http.name == "http"
 
 
 def test_graph_opens_sealed(client) -> None:
     graph = client.app.state
-    assert "crypto" in graph
-    assert "oauth" in graph
+    assert {"core", "adapters", "crypto", "oauth"} <= set(graph)
     with pytest.raises(RuntimeError, match="Sealed"):
         graph.held_by_the_lifespan_only = 1
     with pytest.raises(AttributeError, match="Sealed state has no node"):
@@ -39,11 +64,13 @@ def test_graph_opens_sealed(client) -> None:
 
 async def test_adapters_close_when_the_lifespan_exits() -> None:
     with TestClient(create_app()) as client:
-        store = client.app.state.adapters.sqlite
+        store = client.app.state.adapters.store
         assert client.get("/health").status_code == 200
-        await store.get("anything")  # alive inside the cycle
+        ### alive inside the cycle
+        await store.get("anything")
     with pytest.raises(RuntimeError, match="not connected"):
-        await store.get("anything")  # the stack closed it on shutdown
+        ### the stack closed it on shutdown
+        await store.get("anything")
 
 
 async def test_services_register_configured_idp(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -58,4 +85,4 @@ async def test_services_register_configured_idp(monkeypatch: pytest.MonkeyPatch)
     app = SimpleNamespace(state=State())
     async with services.lifespan(cast("Litestar", app)):
         assert app.state.crypto is not None
-    assert "dev" in app.state.oauth._registry
+    assert registered_providers(app.state.oauth) == ["dev"]

@@ -4,13 +4,15 @@ import hashlib
 import hmac
 import secrets
 from datetime import UTC, datetime, timedelta
-from enum import IntEnum
+from enum import IntEnum, StrEnum
 from functools import partial
-from typing import TYPE_CHECKING, Any, Literal, Self, cast
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any, Final, Literal, Self, cast
 
 import anyio
 import argon2
 import bcrypt
+import beartype
 import msgspec
 from cryptography.exceptions import InvalidSignature, InvalidTag
 from cryptography.hazmat.primitives import hashes, serialization
@@ -30,13 +32,20 @@ from e_core.core.settings import Secret
 from e_core.core.settings.crypto import CryptoSettings, PasswordHasher, TokenAlg, TokenEnc
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
 
 
 ##### TYPES #####
 class TokenShape(IntEnum):
     JWS = 2  # count of "." separators: 3 parts
     JWE = 4  # 5 parts
+
+
+class AlgPrefix(StrEnum):
+    RS = "RS"
+    PS = "PS"
+    ES = "ES"
+    EDDSA = "Ed"  # EdDSA's two-letter prefix, named by the algorithm it opens
 
 
 ##### DEFAULTS #####
@@ -53,13 +62,12 @@ TOKEN_INFO: bytes = b"e-core/token"
 JWE_INFO: bytes = b"e-core/jwe"
 ENCRYPT_INFO: bytes = b"e-core/encrypt"
 SIGN_INFO: bytes = b"e-core/sign"
-ENC_KEY_SIZES: dict[str, int] = {TokenEnc.A128GCM.value: 16, TokenEnc.A256GCM.value: 32}  # dir mode: key IS the CEK
-JOSE_KEY_TYPES: dict[str, Literal["RSA", "EC", "OKP"]] = {
-    "RS": "RSA",
-    "PS": "RSA",
-    "ES": "EC",
-    "Ed": "OKP",
-}  # alg prefix -> joserfc key_type
+ENC_KEY_SIZES: Final[Mapping[TokenEnc, int]] = MappingProxyType(
+    {TokenEnc.A128GCM: 16, TokenEnc.A256GCM: 32}
+)  # dir mode: key IS the CEK
+JOSE_KEY_TYPES: Final[Mapping[AlgPrefix, Literal["RSA", "EC", "OKP"]]] = MappingProxyType(
+    {AlgPrefix.RS: "RSA", AlgPrefix.PS: "RSA", AlgPrefix.ES: "EC", AlgPrefix.EDDSA: "OKP"}
+)  # alg prefix -> joserfc key_type
 MISSING_PRIVATE_KEY: str = "asymmetric engine needs a private_key PEM to sign tokens"
 NO_VERIFY_KEY: str = "engine needs a signing key or a public jwks set to verify"
 MISSING_ROOT: str = "crypto engine needs a secret: set CRYPTO__SECRET or pass CryptoSettings(secret=...)"
@@ -104,7 +112,7 @@ class Crypto:
         self._argon2 = argon2.PasswordHasher()
         self._aead = AESGCM(self._common_derive(ENCRYPT_INFO))
         self._hmac_key = self._common_derive(SIGN_INFO)
-        self._jwe_key = OctKey.import_key(self._common_derive(JWE_INFO, ENC_KEY_SIZES[settings.enc.value]))
+        self._jwe_key = OctKey.import_key(self._common_derive(JWE_INFO, ENC_KEY_SIZES[settings.enc]))
         self._private_key = self._common_load_pem(settings.private_key)
         self._token_key = self._common_build_token_key(settings.alg, settings.private_key)
         match KeySet.import_key_set(cast("Any", jwks)) if jwks else self._token_key:
@@ -139,7 +147,7 @@ class Crypto:
                     case "":
                         return None
                     case _:
-                        return jwk.import_key(pem, JOSE_KEY_TYPES[alg.value[:2]])
+                        return jwk.import_key(pem, JOSE_KEY_TYPES[AlgPrefix(alg.value[:2])])
 
     def _common_verify_claims(self, claims: dict[str, Any], issuer: str | None, audience: str | None) -> None:
         options: dict[str, Any] = {"exp": {"essential": True}, "nbf": {}, "iat": {}}
@@ -355,19 +363,9 @@ class Crypto:
                 raise CryptoError(ENCRYPT_FAILED)
 
 
-# ── runtime type checking (silent fallback if beartype not installed) ──
-try:
-    import beartype as _bt
-except ImportError:
-    pass
-else:
-
-    def _wrap(cls: type) -> type:
-        """Class-level decoration: in-place, and the only form PEP 673 `Self` allows beartype to check."""
-        return _bt.beartype(cls)
-
-    _wrap(Crypto)
-    _wrap(CryptoSettings)
-    _wrap(TokenAlg)
-    _wrap(TokenEnc)
-    _wrap(PasswordHasher)
+##### RUNTIME TYPE CHECKING #####
+Crypto = beartype.beartype(Crypto)
+CryptoSettings = beartype.beartype(CryptoSettings)
+TokenAlg = beartype.beartype(TokenAlg)
+TokenEnc = beartype.beartype(TokenEnc)
+PasswordHasher = beartype.beartype(PasswordHasher)

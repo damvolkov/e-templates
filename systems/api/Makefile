@@ -24,7 +24,7 @@ export PYTHONPATH := $(CURDIR)/src
 .PHONY: help install sync lock core common core-check common-check lint type arch validate harden hooks test cov stress docs docs-build check ci run up down build logs release ci-vars clean
 
 help:
-	@printf "$(BOLD)$(CYAN)$(PROJECT)$(RESET) $(GRAY)· uv · ruff · ty · tach · pytest · properdocs · docker — core/ops materialized from $(CORE_SRC)$(RESET)\n\n"
+	@printf "$(BOLD)$(CYAN)$(PROJECT)$(RESET) $(GRAY)· uv · ruff · ty · tach · pytest · properdocs · docker — core/ops/adapters materialized from $(CORE_SRC)$(RESET)\n\n"
 	@awk 'BEGIN{FS=":.*##"} /^[a-z][a-zA-Z0-9_-]*:.*##/{printf "  $(GREEN)%-12s$(RESET) $(GRAY)%s$(RESET)\n",$$1,$$2}' $(MAKEFILE_LIST)
 
 # — env —
@@ -42,21 +42,11 @@ lock: core ## refresh uv lockfile (against the current materialized core)
 # — common —
 COMMON_SRC ?= ../core/common
 
-core: ## materialize shared core/ + ops/ from systems/core (source of truth)
-	@rm -rf src/core src/ops
-	@cp -r $(CORE_SRC)/core src/core
-	@cp -r $(CORE_SRC)/ops src/ops
-	@find src/core src/ops -name __pycache__ -type d -exec rm -rf {} +
-	@sed -i -e 's/e_core\.core\b/core/g' -e 's/e_core\.ops\b/ops/g' $$(find src/core src/ops -name '*.py')
+core: ## materialize shared core/ + ops/ + adapters/ from systems/core (source of truth) via a structural rewrite
+	@uv run python scripts/materialize.py
 
-core-check: ## fail if the materialized core drifted from systems/core
-	@tmp=$$(mktemp -d); \
-	cp -r $(CORE_SRC)/core $$tmp/core; \
-	cp -r $(CORE_SRC)/ops $$tmp/ops; \
-	find $$tmp -name __pycache__ -type d -exec rm -rf {} +; \
-	sed -i -e 's/e_core\.core\b/core/g' -e 's/e_core\.ops\b/ops/g' $$(find $$tmp -name '*.py'); \
-	if diff -r -x __pycache__ $$tmp/core src/core && diff -r -x __pycache__ $$tmp/ops src/ops; then printf "$(GREEN)✓ core in sync$(RESET)\n"; else printf "$(RED)✗ core drifted: run make core$(RESET)\n"; rm -rf $$tmp; exit 1; fi; \
-	rm -rf $$tmp
+core-check: ## fail if the materialized core/ops/adapters drifted from systems/core
+	@uv run python scripts/materialize.py --check
 
 common: ## materialize shared project files from systems/core/common into the project root
 	@cp $(COMMON_SRC)/pre-commit-config.yaml .pre-commit-config.yaml
@@ -75,8 +65,8 @@ common-check: ## fail if the materialized shared files drifted from systems/core
 
 # — gates —
 lint: ## ruff check + format
-	@uv run ruff check --fix $(PACKAGE) src/core src/ops tests
-	@uv run ruff format $(PACKAGE) src/core src/ops tests
+	@uv run ruff check --fix $(PACKAGE) src/core src/ops src/adapters scripts tests
+	@uv run ruff format $(PACKAGE) src/core src/ops src/adapters scripts tests
 
 type: ## ty type check
 	@uv run ty check
@@ -97,7 +87,7 @@ hooks: ## run all pre-commit hooks on every file (ruff, ty, tach, zizmor, gitlea
 test: ## run tests [TESTARGS='-k expr']
 	@uv run pytest tests $(TESTARGS) -n auto -q
 
-cov: ## run tests with coverage gate (fail under 90%)
+cov: ## run tests with coverage gate (fail under 100%)
 	@uv run pytest tests --cov --cov-report=term-missing
 
 stress: ## soak stress-marked tests for ARGS seconds (pytest-stress)
@@ -143,7 +133,7 @@ logs: ## tail docker logs [args: service]
 
 clean: ## remove caches + build artifacts + materialized core
 	@find . -type d \( -name __pycache__ -o -name .pytest_cache -o -name .ruff_cache \) -exec rm -rf {} + 2>/dev/null || true
-	@rm -rf dist build *.egg-info .coverage .coverage.* .ty_cache site src/core src/ops .pre-commit-config.yaml .gitattributes .python-version
+	@rm -rf dist build *.egg-info .coverage .coverage.* .ty_cache site src/core src/ops src/adapters .pre-commit-config.yaml .gitattributes .python-version
 	@printf "$(GREEN)✓ clean$(RESET)\n"
 
 %:

@@ -14,7 +14,8 @@ SETTINGS = FileFinder("core.settings")
 
 
 def test_modules_skips_packages_and_declared_names() -> None:
-    assert {"crypto", "logger", "state"} <= set(CORE.discover(Kind.MODULES))  # `settings` is a package: excluded
+    ### `settings` is a package: excluded
+    assert {"crypto", "logger", "state"} <= set(CORE.discover(Kind.MODULES))
     assert "base" in SETTINGS.discover(Kind.MODULES)
     strict = FileFinder("core.settings", skip=frozenset({"base"}))
     assert "base" not in strict.discover(Kind.MODULES)
@@ -22,7 +23,9 @@ def test_modules_skips_packages_and_declared_names() -> None:
 
 def test_classes_and_functions_are_own_symbols_only() -> None:
     assert "State" in CORE.discover(Kind.CLASSES)
-    assert {"setup", "encode_json"} <= set(CORE.discover(Kind.FUNCTIONS))
+    assert "ELogger" in CORE.discover(Kind.CLASSES)
+    ### `setup` lives on ELogger now, not in the module namespace: only the plain function is discoverable.
+    assert {"encode_json"} <= set(CORE.discover(Kind.FUNCTIONS))
 
 
 def test_base_selects_subclasses_and_module_target_reads_one_file() -> None:

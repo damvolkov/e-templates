@@ -2,7 +2,7 @@
 
 import io
 import json
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -66,3 +66,26 @@ async def test_elogger_traceback_appended() -> None:
     event: EventDict = {"timestamp": "T", "level": "error", "event": "boom", "exception": "Traceback..."}
     line = renderer(cast("WrappedLogger", None), "error", event)
     assert line.endswith("Traceback...")
+
+
+##### LAZY SINGLETON #####
+async def test_logger_singleton_is_stable_after_first_touch() -> None:
+    assert lg.logger is lg.logger
+
+
+async def test_load_sets_up_when_unconfigured(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The first load runs setup with the app env; the process ends up configured."""
+    monkeypatch.setattr(lg.ELogger, "_configured", False)
+    assert lg.ELogger.load() is not None
+    assert lg.ELogger._configured is True
+
+
+async def test_load_skips_setup_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A lifespan that already called setup is never reconfigured by the lazy logger."""
+    monkeypatch.setattr(lg.ELogger, "_configured", True)
+
+    def refuse(**_: Any) -> None:
+        pytest.fail("the lazy logger must not reconfigure an already-configured process")
+
+    monkeypatch.setattr(lg.ELogger, "setup", refuse)
+    assert lg.ELogger.load() is not None

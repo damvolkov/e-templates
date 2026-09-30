@@ -25,7 +25,8 @@ async def lifespan(app: Litestar) -> AsyncIterator[None]:
     state.oauth = OAuth()
     match st.oauth.server_metadata_url:
         case "":
-            pass  # dev mode: empty registry, the app boots without an IdP
+            ### dev mode: empty registry, the app boots without an IdP
+            pass
         case url:
             state.oauth.register(
                 st.oauth.oauth_name,

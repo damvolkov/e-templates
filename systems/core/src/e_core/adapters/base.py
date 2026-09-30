@@ -1,13 +1,14 @@
-"""adapters.base: the minimum async contract for external services — connect, close, and one shared CRUD shape.
+"""adapters/base: the implementation base for external services — connect, close, async-context bridge.
 
-Subclasses own whatever the client needs internally; the lifespan only ever talks to `connect`/`close`
-(through the async-context bridge), so any backend drops into the `AsyncExitStack` unchanged.
-"""
+The contracts the core consumes are the Protocols in `adapters.ports`; this class is the shared
+implementation skeleton: the lifespan only ever talks to `connect`/`close` (through the async-context
+bridge), so any backend drops into the `AsyncExitStack` unchanged."""
 
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, ClassVar, Self
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
     from types import TracebackType
 
 
@@ -36,7 +37,8 @@ class BaseAdapter(ABC):
 
 
 class StoreAdapter(BaseAdapter):
-    """Byte-keyed store: the same minimum CRUD across backends, so redis and sqlite are interchangeable."""
+    """Byte-keyed store implementation base: the same minimum CRUD across backends,
+    so redis and sqlite are interchangeable and satisfy `StorePort` structurally."""
 
     @abstractmethod
     async def get(self, key: str) -> bytes | None:
@@ -50,5 +52,5 @@ class StoreAdapter(BaseAdapter):
         """Missing key is a no-op."""
 
     @abstractmethod
-    async def keys(self, prefix: str = "") -> list[str]:
-        """Keys starting with `prefix`, sorted."""
+    def keys(self, prefix: str = "") -> AsyncIterator[str]:
+        """Keys starting with `prefix`, streamed lazily: an async generator, never a materialized list."""

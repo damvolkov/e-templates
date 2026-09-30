@@ -102,23 +102,29 @@ class BaseSettings(msgspec.Struct, frozen=True, kw_only=True):
     def nest(cls, pairs: Mapping[str, str]) -> dict[str, Any]:
         """`{"E_DB__PORT": "1"}` → `{"db": {"port": "1"}}`: prefix-filtered,
         case-insensitive, JSON-looking values decoded."""
+
+        def _dig(node: dict[str, Any], part: str) -> dict[str, Any]:
+            """The child dict for `part` under `node`, created and empty on first touch."""
+            return node.setdefault(part, {})
+
         prefix = cls.env_prefix.lower()
         root: dict[str, Any] = {}
         for key, raw in pairs.items():
             if (name := key.lower()).startswith(prefix):
                 value = msgspec.json.decode(raw) if raw[:1] in JSON_MARKERS else raw
                 *parents, leaf = name.removeprefix(prefix).split(cls.nested_delimiter)
-                reduce(lambda node, part: node.setdefault(part, {}), parents, root)[leaf] = value
+                reduce(_dig, parents, root)[leaf] = value
         return root
 
     @staticmethod
     def merge(base: dict[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:
         """Deep merge, lowest layer first: nested dicts fuse key by key, anything else is replaced."""
         for key, value in override.items():
-            if isinstance(base.get(key), dict) and isinstance(value, Mapping):
-                BaseSettings.merge(base[key], value)
-            else:
-                base[key] = value
+            match (base.get(key), value):
+                case (dict() as sub_base, Mapping() as sub_override):
+                    BaseSettings.merge(sub_base, sub_override)
+                case _:
+                    base[key] = value
         return base
 
     @staticmethod

@@ -1,0 +1,100 @@
+##### TEMPLATES #####
+templates:
+  api:
+    source: systems/api
+    package: e_api
+    brand: e-api
+    drops: [uv.lock]
+    common: {root: systems/core, package: e_core, skip: [ops/tui]}
+    materials:
+      - {src: systems/core/common/pre-commit-config.yaml, dst: .pre-commit-config.yaml}
+      - {src: systems/core/common/gitattributes, dst: .gitattributes}
+      - {src: systems/core/common/python-version, dst: .python-version}
+      - {src: systems/core/common/dependabot.yml, dst: .github/dependabot.yml}
+      - {src: systems/core/common/CODEOWNERS, dst: .github/CODEOWNERS}
+
+    ##### MANDATORY — tests that survive every selection; no choice may delete them #####
+    mandatory:
+      - tests/unit/conftest.py
+      - tests/unit/test_ci_contract.py
+      - tests/unit/test_resources.py
+      - tests/resources
+      - tests/unit/e_api/conftest.py
+      - tests/unit/e_api/api/test_assembly.py
+      - tests/unit/e_api/api/test_lifespan.py
+      - tests/unit/e_api/api/test_stress.py
+      - tests/unit/e_api/api/test_transport.py
+      - tests/unit/e_api/ops/test_file.py
+
+    ##### CHOICES — grouped by the wizard stage that owns them #####
+    choices:
+      # ·· modules ··
+      - name: websockets
+        group: modules
+        label: telemetry websocket listener
+        default: true
+        paths: [src/e_api/websockets, src/e_api/models/telemetry.py, tests/unit/e_api/websockets, tests/unit/e_api/models/test_telemetry.py]
+        prunes:
+          - {file: src/e_api/main.py, pattern: '^from e_api\.websockets import telemetry\n'}
+          - {file: src/e_api/main.py, pattern: '^    app\.register\(Router\(path="/", route_handlers=list\(telemetry\.ws_routes\(\)\)\)\)\n'}
+          - {file: tach.toml, pattern: ', "e_api\.websockets"'}
+          - {file: tach.toml, pattern: '\[\[modules\]\]\npath = "e_api\.websockets"\nlayer = "api"\ndepends_on = \["e_api\.api"\]\n\n'}
+          - {file: tests/unit/e_api/api/test_assembly.py, pattern: '"/ws/telemetry", '}
+
+      # ·· infra ··
+      - name: docker
+        group: infra
+        label: container image + compose service
+        default: true
+        paths: [Dockerfile, compose.yml, .dockerignore]
+        prunes:
+          - {file: Makefile, pattern: '^up: core ## docker compose up[^\n]*\n(?:\t[^\n]*\n)+'}
+          - {file: Makefile, pattern: '^down: ## docker compose down\n(?:\t[^\n]*\n)+'}
+          - {file: Makefile, pattern: '^build: core ## docker image build[^\n]*\n(?:\t[^\n]*\n)+'}
+          - {file: Makefile, pattern: '^logs: ## docker compose logs[^\n]*\n(?:\t[^\n]*\n)+'}
+          - {file: Makefile, pattern: '^(PORT|COMPOSE) \?=[^\n]*\n'}
+          - {file: Makefile, pattern: ' up down build logs'}
+          - {file: Makefile, pattern: ' up| down| build| logs'}
+          - {file: .github/workflows/release.yml, pattern: '^  image:\n[\s\S]*'}
+          - {file: .github/ci.vars.example, pattern: '^PUBLISH_IMAGE[^\n]*\n'}
+          - {file: README.md, pattern: '^(Dockerfile|compose\.yml)\s+#.*\n'}
+          - {file: README.md, pattern: '^make up\s+#.*\n'}
+
+      # ·· cicd ··
+      - name: docs
+        group: cicd
+        label: generated API reference + GitHub Pages
+        default: true
+        paths: [properdocs.yml, docs, scripts]
+        prunes:
+          - {file: .github/workflows/ci.yml, pattern: '^  docs:\n[\s\S]*'}
+          - {file: .github/ci.vars.example, pattern: '^DOCS_DEPLOY[^\n]*\n'}
+          - {file: Makefile, pattern: '^# — docs —\n[\s\S]*?(?=^# — aggregate)'}
+          - {file: Makefile, pattern: ' docs-build'}
+          - {file: Makefile, pattern: ' docs'}
+          - {file: Makefile, pattern: ' scripts tests', to: ' tests'}
+          - {file: pyproject.toml, pattern: '^docs = \[[\s\S]*?^\]\n'}
+          - {file: pyproject.toml, pattern: '^    \{ include-group = "docs" \},\n'}
+
+    ##### VERIFY — post-export pipeline; tests steps obey the user's confirmation #####
+    verify:
+      - {name: git init, argv: [git, init, -q]}
+      - {name: uv sync, argv: [uv, sync], tests: true}
+      - {name: make check, argv: [make, check], tests: true}
+
+    ##### FINALIZE — engine plumbing, never a user choice (strips the template's own machinery) #####
+    finalize:
+      - {file: Makefile, pattern: '^# — common —\n[\s\S]*?(?=^# — gates —)'}
+      - {file: Makefile, pattern: '^CORE_SRC \?= .*\n'}
+      - {file: Makefile, pattern: '^COMMON_SRC \?= .*\n'}
+      - {file: Makefile, pattern: ' core-check'}
+      - {file: Makefile, pattern: ' common-check'}
+      - {file: Makefile, pattern: ' core\b(?!/)'}
+      - {file: Makefile, pattern: ' common\b(?!/)'}
+      - {file: .gitignore, pattern: '^# (generated|materialized).*\n'}
+      - {file: .gitignore, pattern: '^src/(core|ops)/\n'}
+      - {file: .gitignore, pattern: '^\.(pre-commit-config\.yaml|gitattributes|python-version)\n'}
+      - {file: .gitignore, pattern: '^\.github/(dependabot\.yml|CODEOWNERS)\n'}
+      - {file: pyproject.toml, pattern: ', shared core materialized from systems/core'}
+      - {file: Makefile, pattern: ' — core/ops/adapters materialized from \$\(CORE_SRC\)'}
+      - {file: README.md, pattern: '^.*\b(GENERATED|make core)\b.*\n'}

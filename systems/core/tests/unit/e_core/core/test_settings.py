@@ -1,4 +1,4 @@
-"""e_core.core.settings: one reader for five layers, frozen msgspec.Struct, e-serde codecs."""
+"""e_core.core.settings: one reader for five layers, frozen msgspec.Struct, e-serde codecs, lazy singleton."""
 
 from typing import TYPE_CHECKING, Any, cast
 
@@ -10,6 +10,9 @@ import pytest
 
 from e_core.core.errors import SettingsLoadError
 from e_core.core.settings import BaseSettings, Secret
+from e_core.core.settings import settings as st
+from e_core.core.settings.api import ApiSettings, HttpMethod
+from e_core.core.settings.app import AppSettings, Env
 
 
 class DB(msgspec.Struct):
@@ -137,3 +140,31 @@ async def test_decode_secret() -> None:
 async def test_decode_unsupported() -> None:
     with pytest.raises(NotImplementedError, match="Unsupported settings type"):
         Settings.decode(complex, 1)
+
+
+##### ENUMS #####
+async def test_app_env_decodes_to_typed_env() -> None:
+    assert AppSettings.load(app_env="local").app_env is Env.LOCAL
+    assert AppSettings.load().app_env in set(Env)
+
+
+async def test_app_env_rejects_a_typo() -> None:
+    with pytest.raises(msgspec.ValidationError, match="Invalid enum value"):
+        AppSettings.load(app_env="deV")
+
+
+async def test_allow_methods_decode_to_typed_verbs() -> None:
+    assert ApiSettings.load(allow_methods=["GET", "DELETE"]).allow_methods == [HttpMethod.GET, HttpMethod.DELETE]
+    assert set(ApiSettings.load().allow_methods) <= set(HttpMethod)
+
+
+async def test_allow_methods_rejects_a_foreign_verb() -> None:
+    with pytest.raises(msgspec.ValidationError, match="Invalid enum value"):
+        ApiSettings.load(allow_methods=["BREW"])
+
+
+##### LAZY SINGLETON #####
+async def test_settings_proxy_loads_once_per_process() -> None:
+    """The first attribute access builds the composite; later touches reuse the same instance."""
+    assert st.app is st.app
+    assert isinstance(st.app.app_env, Env)

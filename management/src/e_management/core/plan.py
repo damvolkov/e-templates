@@ -1,0 +1,52 @@
+"""core.plan: the generation as data — an ordered list of actions, nothing executed, everything inspectable."""
+
+from msgspec import Struct
+
+from e_management.models.manifest import Prune, Strip
+
+
+##### TYPES #####
+class Copy(Struct, frozen=True, kw_only=True):
+    """The template tree, verbatim, minus skips and drops."""
+
+    src: str
+    drops: tuple[str, ...] = ()
+
+
+class Materialize(Struct, frozen=True, kw_only=True):
+    """A shared asset copied over its destination, stripped of its own package paths."""
+
+    src: str
+    dst: str
+    strip: tuple[Strip, ...] = ()
+    excludes: tuple[str, ...] = ()
+
+
+class PrunePaths(Struct, frozen=True, kw_only=True):
+    """Paths removed from the generated tree (files or whole directories)."""
+
+    paths: tuple[str, ...] = ()
+
+
+class PruneTexts(Struct, frozen=True, kw_only=True):
+    """Regex deletions applied to files inside the generated tree."""
+
+    prunes: tuple[Prune, ...] = ()
+
+
+class Rename(Struct, frozen=True, kw_only=True):
+    """Whole-word renames over every text file and every path segment of the tree."""
+
+    rules: tuple[Strip, ...] = ()
+
+
+Action = Copy | Materialize | PrunePaths | PruneTexts | Rename
+
+
+class Plan(Struct, frozen=True, kw_only=True):
+    """A complete, ordered recipe for one project."""
+
+    name: str
+    package: str
+    brand: str
+    actions: tuple[Action, ...] = ()

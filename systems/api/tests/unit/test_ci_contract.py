@@ -8,6 +8,7 @@ undocumented, documented but unused, or enabled by default fails CI.
 
 from __future__ import annotations
 
+import functools
 import re
 from pathlib import Path
 from typing import Final
@@ -20,17 +21,20 @@ VAR_RE: Final = re.compile(r"\bvars\.([A-Z][A-Z0-9_]*)\b")
 ENTRY_RE: Final = re.compile(r"^([A-Z][A-Z0-9_]*)=(\S+)\s*(?:#\s*(\S.*))?$")
 
 
+@functools.cache
 def gates_used() -> set[str]:
+    """Gate names the workflows reference; cached because several tests ask, and the files do not move."""
     return {m.group(1) for file in WORKFLOWS.glob("*.yml") for m in VAR_RE.finditer(file.read_text("utf-8"))}
 
 
+@functools.cache
 def gates_declared() -> dict[str, tuple[str, str]]:
-    entries = {}
-    for line in MANIFEST.read_text("utf-8").splitlines():
-        if match := ENTRY_RE.match(line.strip()):
-            name, default, doc = match.groups()
-            entries[name] = (default, doc or "")
-    return entries
+    """Manifest entries name → (default, doc); the walrus binds each match once, the cache answers every test."""
+    return {
+        m.group(1): (m.group(2), m.group(3) or "")
+        for line in MANIFEST.read_text("utf-8").splitlines()
+        if (m := ENTRY_RE.match(line.strip()))
+    }
 
 
 def test_every_gate_used_by_workflows_is_documented() -> None:

@@ -59,12 +59,13 @@ def test_list_read_update_delete_flow(client, bearer, created_user) -> None:
 
     patched = client.patch(f"/users/{user_id}", json={"email": "alice@e.gov"}, headers=headers)
     assert patched.json()["email"] == "alice@e.gov"
-    assert patched.json()["quota"] == "12.50"  # UNSET fields survive the patch
+    ### UNSET fields survive the patch
+    assert patched.json()["quota"] == "12.50"
 
     assert client.delete(f"/users/{user_id}", headers=headers).status_code == 204
-    # identity died with the record: chain 2 refuses the now-unknown subject...
+    ### identity died with the record: chain 2 refuses the now-unknown subject...
     assert client.get(f"/users/{user_id}", headers=headers).status_code == 401
-    # ...and for a still-valid identity, a missing target is a plain 404
+    ### ...and for a still-valid identity, a missing target is a plain 404
     other = client.post(
         "/users",
         json={"username": "carol", "email": "carol@example.com", "password": "s3cret-passphrase"},
@@ -82,7 +83,7 @@ def test_credential_is_stored_only_as_an_argon2_hash(client, created_user) -> No
     """The crypto-through-the-store chain end to end: what persists is a hash, verifiable and never the password."""
     graph = client.app.state
     with client.portal() as portal:
-        raw = portal.call(graph.adapters.sqlite.get, USER_KEY + created_user["id"])
+        raw = portal.call(graph.adapters.store.get, USER_KEY + created_user["id"])
         record = msgspec.json.decode(raw, type=UserRecord)
         assert record.password_hash.startswith("$argon2id$")
         assert portal.call(graph.crypto.verify_password, "correct-horse-1", record.password_hash)

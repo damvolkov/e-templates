@@ -1,8 +1,11 @@
 """tests/unit: the assembly itself — lazy factory, declarative registration, composite settings."""
 
+from importlib.metadata import version
+
 import msgspec
 
 import e_api.main as entrypoint
+from core.settings import Settings
 from core.settings import settings as st
 
 
@@ -12,7 +15,7 @@ def test_importing_main_has_no_side_effects() -> None:
 
 
 def test_composite_settings_expose_every_scope() -> None:
-    scopes = {f.name for f in msgspec.structs.fields(type(st))}
+    scopes = {field.name for field in msgspec.structs.fields(Settings)}
     assert {"api", "app", "crypto", "db", "http", "oauth", "redis"} <= scopes
     assert st.redis.redis_url.startswith("redis://")
     assert st.app.app_port == 8000
@@ -24,4 +27,12 @@ def test_create_app_registers_every_router(client) -> None:
 
 
 def test_chains_wire_endpoints_not_the_app(client) -> None:
-    assert client.app.dependencies == {}  # every dependency link is declared by the route that consumes it
+    ### every dependency link is declared by the route that consumes it
+    assert client.app.dependencies == {}
+
+
+def test_openapi_contract_comes_from_its_owners(client) -> None:
+    ### the distribution stamps the version; the bearer id is the SecuritySchemeName enum's value.
+    config = client.app.openapi_config
+    assert config.version == version("e-api")
+    assert "bearerAuth" in config.components.security_schemes

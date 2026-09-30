@@ -5,7 +5,8 @@ The guard verifies the token and parks its claims in the connection scope; `prov
 depends on `current_user` is automatically behind the bearer check once `auth_guard` is attached.
 """
 
-from typing import TYPE_CHECKING, Any
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any, Final
 
 from litestar.exceptions import NotAuthorizedException
 from litestar.openapi.spec import SecurityScheme
@@ -16,9 +17,15 @@ if TYPE_CHECKING:
     from litestar.connection import ASGIConnection
     from litestar.handlers import BaseRouteHandler
 
+
 ##### CONTRACT #####
+class SecuritySchemeName(StrEnum):
+    BEARER = "bearerAuth"
+
+
 BEARER_SCHEME = SecurityScheme(type="http", scheme="bearer", bearer_format="JWT")
-SECURITY: list[dict[str, list[str]]] = [{"bearerAuth": []}]
+### OpenAPI requirement maps key by scheme id: the enum owns the vocabulary, `.value` is the str edge litestar types.
+SECURITY: Final[list[dict[str, list[str]]]] = [{SecuritySchemeName.BEARER.value: []}]
 
 
 ##### HELPERS #####

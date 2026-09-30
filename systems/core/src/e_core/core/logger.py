@@ -1,23 +1,25 @@
-"""e-stack logger: structured JSON in prod, ordered plain text in dev/local."""
+"""e-stack logger: structured JSON in prod, ordered plain text in dev/local.
+
+Nothing loads at import: `setup` and the `logger` singleton run on first use, exactly once per process."""
 
 import logging
 import sys
-from collections.abc import Sequence  # noqa: TC003 — beartype resolves ELogger's annotations at runtime
-from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Protocol, TextIO, runtime_checkable
+from collections.abc import Callable, Sequence  # noqa: TC003 — beartype resolves ELogger's annotations at runtime
+from typing import Any, ClassVar, Protocol, TextIO, runtime_checkable
 
+import beartype
 import msgspec
 import structlog
 from structlog.typing import (  # noqa: TC002 — beartype resolves ELogger's annotations at runtime
+    BindableLogger,
     EventDict,
     Processor,
     WrappedLogger,
 )
 
+from e_core.core.proxy import LazyProxy
 from e_core.core.settings import settings as st
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
+from e_core.core.settings.app import Env
 
 
 ##### TYPES #####
@@ -28,14 +30,8 @@ class TextSink(Protocol):
     def isatty(self) -> bool: ...
 
 
-class Env(StrEnum):
-    PROD = "prod"
-    DEV = "dev"
-    LOCAL = "local"
-
-
 ##### DEFAULTS #####
-DEFAULT_ENV: str = Env.DEV
+DEFAULT_ENV: Env = Env.DEV
 DEFAULT_LEVEL: int = logging.INFO
 DEFAULT_ORDER: Sequence[str] = ()
 DEFAULT_SEP: str = " || "
@@ -62,17 +58,15 @@ LEVEL_COLORS: dict[str, str] = {
 }
 
 
-##### SERIALIZERS #####
-def encode_json(event_dict: EventDict, default: Callable[[Any], Any] | None = None) -> bytes:
-    """msgspec (C-backed) serializer, json.dumps-compatible: structlog's `default` hook is msgspec's `enc_hook`."""
-    return msgspec.json.encode(event_dict, enc_hook=default)
-
-
-##### RENDERERS #####
+##### RENDERER #####
 class ELogger:
-    """Render `timestamp | LEVEL | event || key: value || ...`, priority keys first, rest sorted."""
+    """Render `timestamp | LEVEL | event || key: value || ...`, priority keys first, rest sorted.
+
+    Also the setup surface: `ELogger.setup` configures structlog and marks the process configured,
+    `ELogger.load` is what the lazy `logger` singleton builds — setup on first use, never at import."""
 
     __slots__ = ("_dim", "_head_sep", "_kv_fmt", "_levels", "_order", "_order_set", "_reset", "_sep", "_width")
+    _configured: ClassVar[bool] = False
 
     def __init__(
         self,
@@ -106,58 +100,74 @@ class ELogger:
         line = self._sep.join((head, *(self._kv_fmt.format(key=k, value=event_dict[k]) for k in keys)))
         return "\n".join(filter(None, (line, exc)))
 
+    ############################################################
 
-##### SETUP #####
-def setup(
-    *,
-    env: str = DEFAULT_ENV,
-    level: int = DEFAULT_LEVEL,
-    order: Sequence[str] = DEFAULT_ORDER,
-    stream: TextIO = DEFAULT_STREAM,
-    **renderer_kwargs: Any,
-) -> None:
-    """Configure structlog for the given env — called once, right here, at import."""
-    shared: list[Processor] = [
-        structlog.contextvars.merge_contextvars,
-        structlog.processors.add_log_level,
-        structlog.processors.TimeStamper(fmt="iso", utc=True),
-        structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
-    ]
-    match env.lower():
-        case Env.PROD:
-            renderer: Processor = structlog.processors.JSONRenderer(serializer=encode_json)
-            factory: Any = structlog.BytesLoggerFactory(file=stream.buffer)  # msgspec emits bytes
-        case Env.DEV | Env.LOCAL:
-            renderer = ELogger(order=order, stream=stream, **renderer_kwargs)
-            factory = structlog.PrintLoggerFactory(file=stream)
-        case unknown:
-            msg = f"Unknown env {unknown!r}; expected one of {[e.value for e in Env]}"
-            raise ValueError(msg)
+    ##### BOOTSTRAP #####
 
-    structlog.configure(
-        processors=[*shared, renderer],
-        wrapper_class=structlog.make_filtering_bound_logger(level),
-        logger_factory=factory,
-        cache_logger_on_first_use=True,
-    )
+    @staticmethod
+    def encode_json(event_dict: EventDict, default: Callable[[Any], Any] | None = None) -> bytes:
+        """msgspec (C-backed) serializer, json.dumps-compatible: structlog's `default` hook is msgspec's `enc_hook`."""
+        return msgspec.json.encode(event_dict, enc_hook=default)
+
+    @classmethod
+    def setup(
+        cls,
+        *,
+        env: str = DEFAULT_ENV,
+        level: int = DEFAULT_LEVEL,
+        order: Sequence[str] = DEFAULT_ORDER,
+        stream: TextIO = DEFAULT_STREAM,
+        **renderer_kwargs: Any,
+    ) -> None:
+        """Configure structlog for the given env — the first call marks the process configured."""
+        shared: list[Processor] = [
+            structlog.contextvars.merge_contextvars,
+            structlog.processors.add_log_level,
+            structlog.processors.TimeStamper(fmt="iso", utc=True),
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
+        ]
+        match env.lower():
+            case Env.PROD:
+                renderer: Processor = structlog.processors.JSONRenderer(serializer=cls.encode_json)
+                factory: Any = structlog.BytesLoggerFactory(file=stream.buffer)  # msgspec emits bytes
+            case Env.DEV | Env.LOCAL:
+                renderer = ELogger(order=order, stream=stream, **renderer_kwargs)
+                factory = structlog.PrintLoggerFactory(file=stream)
+            case unknown:
+                msg = f"Unknown env {unknown!r}; expected one of {[e.value for e in Env]}"
+                raise ValueError(msg)
+
+        structlog.configure(
+            processors=[*shared, renderer],
+            wrapper_class=structlog.make_filtering_bound_logger(level),
+            logger_factory=factory,
+            cache_logger_on_first_use=True,
+        )
+        cls._configured = True
+
+    @classmethod
+    def load(cls) -> Any:
+        """The process logger: setup with the app env runs here, on first use, never at import.
+
+        `bind()` materializes the lazy proxy structlog hands back.
+        ### the bound-logger class is polymorphic across structlog's stdlib/native wrapper variants:
+        ### the surface is structlog's own untyped edge."""
+        match cls._configured:
+            case False:
+                cls.setup(env=st.app.app_env)
+            case _:
+                pass
+        return structlog.get_logger().bind()
 
 
-# ── runtime type checking (silent fallback if beartype not installed) ──
-try:
-    import beartype as _bt
-except ImportError:
-    pass
-else:
-
-    def _wrap(cls: type) -> type:
-        """Class-level decoration: in-place, and the only form PEP 673 `Self` allows beartype to check."""
-        return _bt.beartype(cls)
-
-    _wrap(ELogger)
-    _wrap(Env)
-
+##### RUNTIME TYPE CHECKING #####
+ELogger = beartype.beartype(ELogger)
 
 ##### SINGLETON #####
-setup(env=st.app.app_env)
-logger = structlog.get_logger()
+### first attribute access only: reading env and configuring structlog must not run at import.
+logger: LazyProxy[BindableLogger] = LazyProxy(ELogger.load)
+
+### systems import `setup`/`encode_json` from the module: the class surface stays reachable, no underscore.
+setup = ELogger.setup
+encode_json = ELogger.encode_json

@@ -22,5 +22,5 @@ def test_correlation_id_echoes_and_unique(client) -> None:
 
     incoming = str(uuid4())
     assert client.get("/health", headers={"x-request-id": incoming}).headers["x-request-id"] == incoming
-    # garbage in is rejected by the middleware validator: a fresh id comes out instead
+    ### garbage in is rejected by the middleware validator: a fresh id comes out instead
     assert client.get("/health", headers={"x-request-id": "not-a-uuid"}).headers["x-request-id"] != "not-a-uuid"

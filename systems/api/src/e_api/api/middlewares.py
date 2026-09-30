@@ -5,10 +5,11 @@ translates it into litestar behaviour and owns the house middleware.
 """
 
 import time
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Final
 
 from asgi_correlation_id import CorrelationIdMiddleware
 from litestar.config.cors import CORSConfig
+from litestar.enums import HttpMethod as LitestarHttpMethod
 from litestar.types import ASGIApp
 
 from core.logger import logger
@@ -50,14 +51,19 @@ class AccessLogMiddleware:
                 await self._app(scope, receive, send)
 
 
-def cors_config(settings: ApiSettings = st.api) -> CORSConfig:
+def cors_config(settings: ApiSettings | None = None) -> CORSConfig:
     """Translate the settings struct into litestar's config object — data in, behaviour out."""
-    # litestar types allow_methods as a str-union msgspec itself forbids; the wire contract is plain method names.
+    ### the default resolves inside the body: an `st.api` default would freeze at import and defeat the lazy singleton.
+    resolved = st.api if settings is None else settings
+    ### two verb enums, one wire contract: settings own the vocabulary, values cross into litestar's at this edge.
     return CORSConfig(
-        allow_origins=settings.allow_origins,
-        allow_methods=cast("list[Any]", settings.allow_methods),
+        allow_origins=resolved.allow_origins,
+        allow_methods=[LitestarHttpMethod(method.value) for method in resolved.allow_methods],
         allow_headers=["*"],
     )
 
 
-MIDDLEWARES: tuple[type, ...] = (CorrelationIdMiddleware, AccessLogMiddleware)
+type MiddlewareClass = type[CorrelationIdMiddleware] | type[AccessLogMiddleware]
+### the honest union of the two classes this stack ships; litestar's own `Middleware` alias is looser,
+### and asgi_correlation_id types its scope narrower than the protocol — the wiring edge is main.py.
+MIDDLEWARES: Final[tuple[MiddlewareClass, ...]] = (CorrelationIdMiddleware, AccessLogMiddleware)

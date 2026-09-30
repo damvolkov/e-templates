@@ -28,5 +28,5 @@ def test_stale_heartbeat_downgrades(client) -> None:
 def test_malformed_frame_is_rejected(client) -> None:
     with client.websocket_connect("/ws/telemetry") as ws:
         ws.send_json({"seq": -1, "sent_at": datetime.now(UTC).isoformat()})
-        # validation failure closes the connection — the loop is over, no crash
+        ### validation failure closes the connection — the loop is over, no crash
         ws.close()

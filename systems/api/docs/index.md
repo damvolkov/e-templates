@@ -6,7 +6,7 @@ Litestar + Granian + msgspec end to end, Rust-backed tooling.
 ## Quickstart
 
 ```bash
-make install    # materialize core/ops + shared files, uv sync, git hooks
+make install    # materialize core/ops/adapters + shared files, uv sync, git hooks
 make check      # lint + types + architecture + drift + tests
 make run        # python -m e_api
 make docs       # serve this site at http://localhost:8000
@@ -15,8 +15,8 @@ make up         # docker compose up
 
 ## Layout
 
-The service lives in `src/e_api/`, layered by [tach](https://tach.dev). `src/core/` and `src/ops/`
-are **materialized** from the common core by `make core` — edit them there, never here:
+The service lives in `src/e_api/`, layered by [tach](https://tach.dev). `src/core/`, `src/ops/` and
+`src/adapters/` are **materialized** from the common core by `make core` — edit them there, never here:
 
 | Module | Layer | Purpose |
 |---|---|---|
@@ -24,7 +24,8 @@ are **materialized** from the common core by `make core` — edit them there, ne
 | [`e_api.api.security`](reference/e_api/api/security.md) | api | Bearer enforcement and the OpenAPI contract |
 | [`e_api.api.middlewares`](reference/e_api/api/middlewares.md) | api | Correlation id, CORS and the middleware chain |
 | [`e_api.api.deps`](reference/e_api/api/deps.md) | api | Dependency chains: store access, current user, graph |
-| [`e_api.adapters.redis`](reference/e_api/adapters/redis.md) | adapters | Connect/close edges — redis, sqlite, http (wreq) |
+| [`e_api.api.lifespan.core`](reference/e_api/api/lifespan/core.md) | api | One-time load of the core singletons, mirrored into `state.core` |
+| [`adapters.ports`](reference/adapters/ports.md) | adapters | Structural contracts — StorePort, HttpPort; sqlite, redis, http implement them (materialized) |
 | [`e_api.models.user`](reference/e_api/models/user.md) | models | msgspec DTO families — the only place data crosses trust boundaries |
 | [`e_api.websockets.telemetry`](reference/e_api/websockets/telemetry.md) | api | Typed websocket listeners — structured frames in and out |
 | [`core.settings`](reference/core/settings/index.md) | core | Composed settings: one BaseSettings reader, per-scope structs (materialized) |
