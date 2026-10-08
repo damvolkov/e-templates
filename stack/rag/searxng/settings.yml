@@ -38,6 +38,7 @@ outgoing:
   pool_maxsize: 20
 
 # Every upstream engine on (image 2026.9.17, probed one by one 2026-10-07): keyless ones answer; keyed ones are left to upstream.
+# yacy: the bundled rag/yacy peer (global = its index plus the P2P network).
 # Off: shadow libraries, and engines broken upstream (parse errors, crashes, HTTP/SSL/API errors).
 # Timeouts cap a query near 5 s with ~35 engines answering: clients like OpenHuman cut at 10 s.
 engines:
@@ -296,8 +297,8 @@ engines:
   - {name: "rubygems", disabled: false, inactive: false}
   - {name: "peertube", disabled: false, inactive: false}
   - {name: "mediathekviewweb", disabled: false, inactive: false}
-  - {name: "yacy", disabled: false, inactive: false}
-  - {name: "yacy images", disabled: false, inactive: false}
+  - {name: "yacy", base_url: ["http://yacy:8090"], enable_http: true, search_mode: global, disabled: false, inactive: false}
+  - {name: "yacy images", base_url: ["http://yacy:8090"], enable_http: true, search_mode: global, disabled: false, inactive: false}
   - {name: "rumble", disabled: false, inactive: false}
   - {name: "reloado", disabled: false, inactive: false}
   - {name: "resulthunter", disabled: false, inactive: false}

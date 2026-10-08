@@ -24,6 +24,10 @@ Convenciones:
   tolera un pin sólo cuando el tag `latest` no existe o el número fija formato
   (p. ej. `pgvector:pg17`, major de Postgres; `llama.cpp:server-cuda` y
   TEI `cpu-latest` son ya tags flotantes).
+- **Pares indivisibles.** Un servicio que solo existe para otro vive en su propia carpeta
+  pero no se levanta solo: el principal lo `include`a y lo exige con `depends_on`
+  (`required: true`, `service_healthy`). Un `compose up` levanta ambos; un `down`, ambos.
+  Hoy: `rag/searxng` ⊃ `rag/yacy`.
 - `stack/_template/compose.yml` es la **plantilla absoluta** con todos los campos
   de Compose y valores fake: cópiala y poda para dar de alta un servicio.
 
@@ -51,7 +55,7 @@ Infra y aplicaciones:
 | `storage` | objetos/archivos, datalakes | minio |
 | `llm` | serving de modelos y embeddings | vllm, llamacpp, ellm, embed |
 | `speech` | STT / TTS | evoice, speaches, fwhisper, wlive, kokoro |
-| `rag` | retrieval: búsqueda, loaders, extracción, pipelines | searxng, docling, playwright, pipelines |
+| `rag` | retrieval: búsqueda, loaders, extracción, pipelines | searxng (+ yacy), docling, playwright, pipelines |
 | `front` | UIs y dashboards | openwebui |
 | `media` | WebRTC / tiempo real | livekit, sip |
 
@@ -74,7 +78,8 @@ Puerto = default en host (`:container`). GPU = necesita `nvidia` runtime.
 | speech/fwhisper | fedirz/faster-whisper-server:latest-cuda | 8000 | ✓ | |
 | speech/wlive | collabora/whisperlive-gpu:latest | 9090 | ✓ | |
 | speech/kokoro | remsky/kokoro-fastapi-gpu:latest | 8880 | ✓ | |
-| rag/searxng | searxng/searxng:latest | 8080 | | `settings.yml`, `limiter.toml` |
+| rag/searxng | searxng/searxng:latest | 8080 | | `settings.yml`, `limiter.toml`; incluye `rag/yacy` |
+| rag/yacy | yacy/yacy_search_server:latest | 8090 (loopback) | | índice propio P2P de searxng; no se levanta solo |
 | rag/docling | docling-project/docling-serve:latest | 5001 | | |
 | rag/playwright | playwright:latest | 3000 | | |
 | rag/pipelines | open-webui/pipelines:latest | 9099 | | |
@@ -93,7 +98,7 @@ Puerto = default en host (`:container`). GPU = necesita `nvidia` runtime.
 redis:6379        postgres:5432     qdrant:6333      minio:9000
 vllm:8000/v1      llamacpp:8080     ellm:80          embed:80/v1
 kokoro:8880/v1    fwhisper:8000     evoice:80        speaches:8000
-searxng:8080      docling:5001      playwright:3000  pipelines:9099
+searxng:8080      yacy:8090         docling:5001      playwright:3000  pipelines:9099
 otel-collector:4317   jaeger:16686   prometheus:9090   loki:3100   grafana:3000
 livekit:7880
 ```
